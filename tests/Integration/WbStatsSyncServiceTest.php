@@ -5,7 +5,9 @@ namespace App\Tests\Integration;
 use App\Entity\Campaign;
 use App\Entity\Cluster;
 use App\Repository\CampaignRepository;
+use App\Service\CampaignRemovalService;
 use App\Sync\WbStatsSyncService;
+use App\WbApi\WbApiMockProvider;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -21,12 +23,9 @@ final class WbStatsSyncServiceTest extends KernelTestCase
         $em = self::getContainer()->get(EntityManagerInterface::class);
         $syncService = self::getContainer()->get(WbStatsSyncService::class);
         $campaignRepository = self::getContainer()->get(CampaignRepository::class);
+        $removal = self::getContainer()->get(CampaignRemovalService::class);
 
-        $wbAdvertId = random_int(930001, 939999);
-        $campaign = new Campaign($wbAdvertId, 'sync bids integration');
-        $em->persist($campaign);
-        $em->flush();
-
+        $campaign = $this->freshDemoCampaign($em, $campaignRepository, $removal, 'sync bids integration');
         $syncService->syncCampaign($campaign);
         $em->clear();
 
@@ -51,12 +50,9 @@ final class WbStatsSyncServiceTest extends KernelTestCase
         $em = self::getContainer()->get(EntityManagerInterface::class);
         $syncService = self::getContainer()->get(WbStatsSyncService::class);
         $campaignRepository = self::getContainer()->get(CampaignRepository::class);
+        $removal = self::getContainer()->get(CampaignRemovalService::class);
 
-        $wbAdvertId = random_int(940001, 949999);
-        $campaign = new Campaign($wbAdvertId, 'resync bids integration');
-        $em->persist($campaign);
-        $em->flush();
-
+        $campaign = $this->freshDemoCampaign($em, $campaignRepository, $removal, 'resync bids integration');
         $syncService->syncCampaign($campaign);
 
         $cluster = $campaign->getClusters()->first();
@@ -93,5 +89,24 @@ final class WbStatsSyncServiceTest extends KernelTestCase
         $em->refresh($cluster);
 
         $this->assertSame(22222, $cluster->getCurrentBidKopecks());
+    }
+
+    private function freshDemoCampaign(
+        EntityManagerInterface $em,
+        CampaignRepository $campaignRepository,
+        CampaignRemovalService $removal,
+        string $name,
+    ): Campaign {
+        $existing = $campaignRepository->findOneBy(['wbAdvertId' => WbApiMockProvider::DEMO_ADVERT_ID]);
+        if ($existing !== null) {
+            $removal->delete($existing);
+        }
+
+        $campaign = new Campaign(WbApiMockProvider::DEMO_ADVERT_ID, $name);
+        $campaign->setSeedNmId(WbApiMockProvider::DEMO_NM_ID);
+        $em->persist($campaign);
+        $em->flush();
+
+        return $campaign;
     }
 }

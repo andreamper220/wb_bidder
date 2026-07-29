@@ -86,6 +86,28 @@ class Campaign
     #[ORM\Column]
     private bool $biddingEnabled = false;
 
+    /**
+     * Seed article ID for first sync when the campaign has no clusters yet.
+     * Without this, cluster discovery cannot start (WB stats require nmId).
+     */
+    #[ORM\Column(nullable: true)]
+    private ?int $seedNmId = null;
+
+    /** Completed days excluded from the end of the metrics window (order attribution lag). */
+    #[ORM\Column]
+    private int $attributionLagDays = 1;
+
+    /** Minimum relative bid change (%); smaller steps become HOLD. */
+    #[ORM\Column]
+    private int $minChangePct = 3;
+
+    /**
+     * Optional WB campaign status. fullstats only works for 7/9/11.
+     * null = unknown / allow sync.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?int $wbStatus = null;
+
     /** @var Collection<int, Cluster> */
     #[ORM\OneToMany(mappedBy: 'campaign', targetEntity: Cluster::class, cascade: ['persist'], orphanRemoval: true)]
     private Collection $clusters;
@@ -355,6 +377,54 @@ class Campaign
     public function setBiddingEnabled(bool $biddingEnabled): self
     {
         $this->biddingEnabled = $biddingEnabled;
+
+        return $this;
+    }
+
+    public function getSeedNmId(): ?int
+    {
+        return $this->seedNmId;
+    }
+
+    public function setSeedNmId(?int $seedNmId): self
+    {
+        $this->seedNmId = $seedNmId;
+
+        return $this;
+    }
+
+    public function getAttributionLagDays(): int
+    {
+        return $this->attributionLagDays;
+    }
+
+    public function setAttributionLagDays(int $attributionLagDays): self
+    {
+        $this->attributionLagDays = max(0, $attributionLagDays);
+
+        return $this;
+    }
+
+    public function getMinChangePct(): int
+    {
+        return $this->minChangePct;
+    }
+
+    public function setMinChangePct(int $minChangePct): self
+    {
+        $this->minChangePct = max(0, $minChangePct);
+
+        return $this;
+    }
+
+    public function getWbStatus(): ?int
+    {
+        return $this->wbStatus;
+    }
+
+    public function setWbStatus(?int $wbStatus): self
+    {
+        $this->wbStatus = $wbStatus;
 
         return $this;
     }

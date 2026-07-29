@@ -24,7 +24,11 @@ final class MetricsAggregator
 
     public function aggregateCampaign(Campaign $campaign): CampaignMetrics
     {
-        $stats = $this->campaignDailyStatRepository->findForWindow($campaign, $campaign->getMetricsWindowDays());
+        $stats = $this->campaignDailyStatRepository->findForWindow(
+            $campaign,
+            $campaign->getMetricsWindowDays(),
+            $campaign->getAttributionLagDays(),
+        );
 
         $views = 0;
         $clicks = 0;
@@ -45,7 +49,11 @@ final class MetricsAggregator
 
     public function aggregateCluster(Cluster $cluster, int $windowDays): ClusterMetrics
     {
-        $stats = $this->clusterDailyStatRepository->findForWindow($cluster, $windowDays);
+        $stats = $this->clusterDailyStatRepository->findForWindow(
+            $cluster,
+            $windowDays,
+            $cluster->getCampaign()->getAttributionLagDays(),
+        );
 
         $views = 0;
         $clicks = 0;

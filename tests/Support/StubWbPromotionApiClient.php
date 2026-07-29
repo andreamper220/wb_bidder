@@ -21,33 +21,38 @@ final class StubWbPromotionApiClient implements WbPromotionApiClient
     /** @var list<array{advertId: int, nmId: int}> */
     public array $getNormqueryBidsCalls = [];
 
-    /** @var list<array{advertId: int, nmId: int, normQuery: string, bidKopecks: int}> */
-    public array $setClusterBidCalls = [];
+    /** @var list<list<array{advertId: int, nmId: int, normQuery: string, bidKopecks: int}>> */
+    public array $setClusterBidsCalls = [];
 
-    public function getFullstats(int $advertId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    /** @var list<list<array{advertId: int, nmId: int, normQuery: string}>> */
+    public array $deleteClusterBidsCalls = [];
+
+    public function getFullstats(array $advertIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         return $this->fullstats;
     }
 
-    public function getNormqueryStats(int $advertId, int $nmId, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    public function getNormqueryStats(array $items, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         return $this->normqueryStats;
     }
 
-    public function getNormqueryBids(int $advertId, int $nmId): array
+    public function getNormqueryBids(array $items): array
     {
-        $this->getNormqueryBidsCalls[] = ['advertId' => $advertId, 'nmId' => $nmId];
+        foreach ($items as $item) {
+            $this->getNormqueryBidsCalls[] = $item;
+        }
 
         return $this->normqueryBids;
     }
 
-    public function setClusterBid(int $advertId, int $nmId, string $normQuery, int $bidKopecks): void
+    public function setClusterBids(array $bids): void
     {
-        $this->setClusterBidCalls[] = [
-            'advertId' => $advertId,
-            'nmId' => $nmId,
-            'normQuery' => $normQuery,
-            'bidKopecks' => $bidKopecks,
-        ];
+        $this->setClusterBidsCalls[] = $bids;
+    }
+
+    public function deleteClusterBids(array $bids): void
+    {
+        $this->deleteClusterBidsCalls[] = $bids;
     }
 }

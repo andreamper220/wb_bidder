@@ -3,50 +3,45 @@
 namespace App\Math;
 
 /**
- * Decimal math with bcmath when available, float fallback for dev containers.
+ * Decimal math. Requires ext-bcmath — floating-point fallback is intentionally absent
+ * so the same inputs produce the same decisions in every environment.
  */
 final class Bc
 {
     public static function div(string $left, string $right, int $scale = 4): string
     {
-        if (function_exists('bcdiv')) {
-            return \bcdiv($left, $right, $scale);
-        }
+        self::assertBcmath();
 
-        if ((float) $right === 0.0) {
-            return '0';
-        }
-
-        return number_format((float) $left / (float) $right, $scale, '.', '');
+        return \bcdiv($left, $right, $scale);
     }
 
     public static function add(string $left, string $right, int $scale = 2): string
     {
-        if (function_exists('bcadd')) {
-            return \bcadd($left, $right, $scale);
-        }
+        self::assertBcmath();
 
-        return number_format((float) $left + (float) $right, $scale, '.', '');
+        return \bcadd($left, $right, $scale);
     }
 
     public static function sub(string $left, string $right, int $scale = 4): string
     {
-        if (function_exists('bcsub')) {
-            return \bcsub($left, $right, $scale);
-        }
+        self::assertBcmath();
 
-        return number_format((float) $left - (float) $right, $scale, '.', '');
+        return \bcsub($left, $right, $scale);
     }
 
     public static function comp(string $left, string $right, int $scale = 4): int
     {
-        if (function_exists('bccomp')) {
-            return \bccomp($left, $right, $scale);
+        self::assertBcmath();
+
+        return \bccomp($left, $right, $scale);
+    }
+
+    private static function assertBcmath(): void
+    {
+        if (!\extension_loaded('bcmath')) {
+            throw new \RuntimeException(
+                'ext-bcmath is required for monetary arithmetic. Install the extension; silent float fallback is not allowed.',
+            );
         }
-
-        $l = (float) $left;
-        $r = (float) $right;
-
-        return $l <=> $r;
     }
 }

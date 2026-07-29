@@ -1,0 +1,19 @@
+# Зоны обязательного ревью человеком — гейт G5 из docs/02-AI-WORKFLOW.md.
+#
+# Отдельно вынесены тесты стратегии и метрик: они являются спецификацией,
+# и их изменение не должно проходить вместе с изменением проверяемого кода
+# (правило R-11).
+
+/src/Bidding/                @maintainer
+/src/WbApi/                  @maintainer
+/src/Metrics/                @maintainer
+/migrations/                 @maintainer
+/config/                     @maintainer
+
+/tests/Unit/Bidding/         @maintainer
+/tests/Unit/Metrics/         @maintainer
+
+/.cursor/rules/              @maintainer
+/AGENTS.md                   @maintainer
+/scripts/gates.sh            @maintainer
+/scripts/gates-baseline.txt  @maintainer

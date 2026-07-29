@@ -4,19 +4,19 @@
       "advert_id": 100001,
       "nm_id": 987654321,
       "norm_query": "кроссовки мужские",
-      "bid": 5000
+      "bid_kopecks": 5000
     },
     {
       "advert_id": 100001,
       "nm_id": 987654321,
       "norm_query": "кроссовки черные",
-      "bid": 8000
+      "bid_kopecks": 8000
     },
     {
       "advert_id": 100001,
       "nm_id": 987654321,
       "norm_query": "кроссовки бег",
-      "bid": 12000
+      "bid_kopecks": 12000
     }
   ]
 }

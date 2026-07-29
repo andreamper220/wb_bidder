@@ -1,37 +1,79 @@
-# Architecture
+# Архитектура
 
-## Two-level strategy (Variant B)
+Краткая карта системы. Полное техническое задание с обоснованием решений —
+[docs/01-TECHNICAL-SPEC.md](docs/01-TECHNICAL-SPEC.md).
 
-1. **Level 1 — Campaign ROAS** (`fullstats`, exact revenue) → mode DEFENSIVE / BALANCED / GROWTH
-2. **Level 2 — Cluster CPA** (`normquery/stats`) → proposal up/down/hold/pause
-3. **Merge** — DEFENSIVE blocks UP proposals
-4. **Guards** — min/max bid, cooldown (Chain of Responsibility)
-5. **Execution** — WB API set bids (`wb_execution` queue)
+## Что делает система
 
-## Patterns
+Контур управления с обратной связью: читает статистику рекламных кампаний Wildberries, сравнивает
+эффективность с экономическими порогами селлера и корректирует ставки поисковых кластеров.
+Без ML — вся логика в порогах, которые селлер выводит из своей маржинальности.
 
-| Pattern | Location |
-|---------|----------|
-| Adapter | `WbPromotionApiAdapter`, `WbApiResponseMapper` |
-| DTO | `src/WbApi/Dto/` |
-| Strategy | `ClusterCpaStrategy` |
-| Pipeline | `BiddingPipeline` |
-| Chain of Responsibility | `BidGuardChain` |
-| Command | `src/Message/`, `src/Command/` |
-| Repository | `src/Repository/` |
+## Двухуровневая стратегия
 
-## Queues
+| Уровень | Метрика | Источник | Результат |
+|---|---|---|---|
+| 1 — кампания | ROAS = выручка / расход | `GET /adv/v3/fullstats` | режим DEFENSIVE / BALANCED / GROWTH |
+| 2 — кластер | CPA = расход / заказы | `POST /adv/v0/normquery/stats` | предложение UP / DOWN / HOLD / PAUSE |
 
-- `wb_sync` — fetch stats + current bids from WB API
-- `wb_bidding` — calculate decisions
-- `wb_execution` — apply bids to WB
+Два уровня нужны потому, что **WB API не отдаёт выручку на уровне кластера** — ROAS там посчитать
+нельзя. CPA кластера отвечает на вопрос «какую ставку менять», ROAS кампании — «можно ли вообще
+расширяться». Режим ограничивает только рост: `DOWN` и `PAUSE` не блокируются ничем.
 
-## Granularity
+Полная спецификация алгоритма с таблицами решений и числовыми примерами —
+[docs/BIDDING_STRATEGY.md](docs/BIDDING_STRATEGY.md).
 
-- Campaign — ROAS (Level 1)
-- Cluster — CPA (Level 2)
-- Phrase — **not supported by WB API** (disabled in UI)
+## Конвейер
 
-## Production
+```
+Планировщик → wb_sync → wb_bidding → wb_execution → WB API
+              (чтение)   (расчёт)     (запись)
+```
 
-See [docs/PRODUCTION.md](docs/PRODUCTION.md) for real campaign setup (API keys, workers, dry-run → live).
+| Очередь | Что делает | Ограничение |
+|---|---|---|
+| `wb_sync` | статистика кампаний и кластеров, текущие ставки | 3–10 запросов/мин к WB — самый узкий участок |
+| `wb_bidding` | расчёт решений, запись в `bid_decisions` | обращений к WB нет |
+| `wb_execution` | применение решений через WB API | 120 запросов/мин |
+
+Подробнее, включая идемпотентность и обработку отказов — [docs/QUEUES.md](docs/QUEUES.md).
+
+## Слои
+
+| Пакет | Отвечает за | Не знает о |
+|---|---|---|
+| `src/WbApi/` | HTTP, версии эндпоинтов, единицы измерения, DTO | доменных правилах |
+| `src/Sync/` | приведение ответов API к сущностям | ставках |
+| `src/Metrics/` | агрегация окна, ROAS/CPA, режим кампании | HTTP |
+| `src/Bidding/` | предложение, слияние, предохранители, пайплайн | HTTP, Doctrine (кроме `Pipeline`) |
+| `src/Service/`, `src/MessageHandler/` | применение решений, статусы | внутренностях стратегии |
+| `src/Controller/`, `src/Admin/` | настройка, наблюдение, аварийные действия | внутренностях стратегии |
+
+Стратегии и предохранители — чистые функции над значениями. Это предпосылка для проверки их
+инвариантов перебором, а не примерами. Обоснование паттернов — [docs/PATTERNS.md](docs/PATTERNS.md).
+
+## Гранулярность управления
+
+| Уровень | Поддержка |
+|---|---|
+| Кампания | ROAS, режим |
+| Артикул (`nmId`) | не управляется отдельно |
+| Кластер (`norm_query`) | **ставка** — минимальная управляемая единица |
+| Отдельная поисковая фраза | не поддерживается WB API |
+
+## Предохранители
+
+Отдельная цепочка после стратегии. Каждый элемент может только ослабить действие до `HOLD`, но не
+изменить направление и не усилить шаг.
+
+Реализованы: границы ставки, cooldown между изменениями, ограничение шага в процентах.
+Требуются: мёртвая зона, суточный бюджет изменений, свежесть данных, kill switch, контроль скорости
+расхода — [§10 ТЗ](docs/01-TECHNICAL-SPEC.md#10-предохранители).
+
+## Что важно знать перед боевым запуском
+
+- Ограничения WB API определяют дизайн сильнее, чем что-либо ещё:
+  [docs/WB-API-LIMITS.md](docs/WB-API-LIMITS.md).
+- Прототип **не готов** к работе на реальных деньгах без устранения блокирующих дефектов:
+  [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md).
+- Пошаговое подключение реальной кампании: [docs/PRODUCTION.md](docs/PRODUCTION.md).

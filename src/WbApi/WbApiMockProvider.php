@@ -6,39 +6,74 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 final class WbApiMockProvider
 {
+    public const DEMO_ADVERT_ID = 100001;
+    public const DEMO_NM_ID = 987654321;
+
     public function __construct(
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
     ) {
     }
 
-    public function getFullstats(): array
+    /**
+     * @param list<int> $advertIds
+     */
+    public function getFullstats(array $advertIds = []): array
     {
+        if ($advertIds !== [] && !\in_array(self::DEMO_ADVERT_ID, $advertIds, true)) {
+            return [];
+        }
+
         $path = $this->projectDir . '/tests/Fixtures/WbApi/fullstats.json';
         $data = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
 
         return $this->shiftFullstatsDates($data);
     }
 
-    public function getNormqueryStats(): array
+    /**
+     * @param list<array{advertId: int, nmId: int}> $items
+     */
+    public function getNormqueryStats(array $items = []): array
     {
+        if ($items !== [] && !$this->itemsMatchDemo($items)) {
+            return ['items' => []];
+        }
+
         $path = $this->projectDir . '/tests/Fixtures/WbApi/normquery_stats.json';
         $data = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
 
         return $this->shiftNormqueryDates($data);
     }
 
-    public function getNormqueryBids(): array
+    /**
+     * @param list<array{advertId: int, nmId: int}> $items
+     */
+    public function getNormqueryBids(array $items = []): array
     {
-        $path = $this->projectDir . '/tests/Fixtures/WbApi/normquery_bids.json';
-        $data = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+        if ($items !== [] && !$this->itemsMatchDemo($items)) {
+            return ['bids' => []];
+        }
 
-        return $data;
+        $path = $this->projectDir . '/tests/Fixtures/WbApi/normquery_bids.json';
+
+        return json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
     }
 
     /**
-     * Keeps demo fixtures inside the metrics window regardless of calendar date.
-     *
+     * @param list<array{advertId: int, nmId: int}> $items
+     */
+    private function itemsMatchDemo(array $items): bool
+    {
+        foreach ($items as $item) {
+            if ((int) $item['advertId'] === self::DEMO_ADVERT_ID && (int) $item['nmId'] === self::DEMO_NM_ID) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $data
      *
      * @return array<int, array<string, mixed>>

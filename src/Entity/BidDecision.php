@@ -129,6 +129,13 @@ class BidDecision
         return $this->reason;
     }
 
+    public function setReason(string $reason): self
+    {
+        $this->reason = $reason;
+
+        return $this;
+    }
+
     public function getStatus(): BidDecisionStatus
     {
         return $this->status;

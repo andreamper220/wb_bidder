@@ -3,10 +3,10 @@
 namespace App\Tests\Unit\Sync;
 
 use App\Entity\Campaign;
-use App\Entity\CampaignDailyStat;
 use App\Entity\Cluster;
-use App\Entity\ClusterDailyStat;
+use App\Repository\CampaignDailyStatRepository;
 use App\Repository\CampaignRepository;
+use App\Repository\ClusterDailyStatRepository;
 use App\Sync\WbStatsSyncService;
 use App\Tests\Support\StubWbPromotionApiClient;
 use App\WbApi\Dto\FullstatsCampaignDto;
@@ -14,7 +14,6 @@ use App\WbApi\Dto\FullstatsDayDto;
 use App\WbApi\Dto\NormqueryClusterBidDto;
 use App\WbApi\Dto\NormqueryClusterStatDto;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\EntityRepository;
 use PHPUnit\Framework\TestCase;
 
 final class WbStatsSyncServiceBidsTest extends TestCase
@@ -23,6 +22,7 @@ final class WbStatsSyncServiceBidsTest extends TestCase
     {
         $date = new \DateTimeImmutable('2026-07-21');
         $campaign = new Campaign(200001, 'bids sync');
+        $campaign->setSeedNmId(111222333);
         $stubApi = new StubWbPromotionApiClient();
         $stubApi->fullstats = [
             new FullstatsCampaignDto(200001, 1000, 100, 10, '1000', '4000', [
@@ -38,12 +38,7 @@ final class WbStatsSyncServiceBidsTest extends TestCase
             new NormqueryClusterBidDto(200001, 111222333, 'кроссовки черные', 8000),
         ];
 
-        $service = new WbStatsSyncService(
-            $this->createMock(CampaignRepository::class),
-            $stubApi,
-            $this->createEntityManagerMock(),
-        );
-
+        $service = $this->service($stubApi);
         $service->syncCampaign($campaign);
 
         $bids = $this->clusterBidsByNormQuery($campaign);
@@ -58,6 +53,7 @@ final class WbStatsSyncServiceBidsTest extends TestCase
     {
         $date = new \DateTimeImmutable('2026-07-21');
         $campaign = new Campaign(200002, 'zero default');
+        $campaign->setSeedNmId(111222333);
         $stubApi = new StubWbPromotionApiClient();
         $stubApi->fullstats = [
             new FullstatsCampaignDto(200002, 500, 50, 5, '250', '1000', [
@@ -71,13 +67,7 @@ final class WbStatsSyncServiceBidsTest extends TestCase
             new NormqueryClusterBidDto(200002, 111222333, 'кроссовки бег', 12000),
         ];
 
-        $service = new WbStatsSyncService(
-            $this->createMock(CampaignRepository::class),
-            $stubApi,
-            $this->createEntityManagerMock(),
-        );
-
-        $service->syncCampaign($campaign);
+        $this->service($stubApi)->syncCampaign($campaign);
 
         $cluster = $campaign->getClusters()->first();
         $this->assertNotFalse($cluster);
@@ -102,13 +92,7 @@ final class WbStatsSyncServiceBidsTest extends TestCase
         ];
         $stubApi->normqueryBids = [];
 
-        $service = new WbStatsSyncService(
-            $this->createMock(CampaignRepository::class),
-            $stubApi,
-            $this->createEntityManagerMock(),
-        );
-
-        $service->syncCampaign($campaign);
+        $this->service($stubApi)->syncCampaign($campaign);
 
         $this->assertSame(15000, $cluster->getCurrentBidKopecks());
     }
@@ -133,13 +117,7 @@ final class WbStatsSyncServiceBidsTest extends TestCase
             new NormqueryClusterBidDto(200004, 111222333, 'кроссовки мужские', 9500),
         ];
 
-        $service = new WbStatsSyncService(
-            $this->createMock(CampaignRepository::class),
-            $stubApi,
-            $this->createEntityManagerMock(),
-        );
-
-        $service->syncCampaign($campaign);
+        $this->service($stubApi)->syncCampaign($campaign);
 
         $this->assertSame(9500, $cluster->getCurrentBidKopecks());
     }
@@ -162,13 +140,7 @@ final class WbStatsSyncServiceBidsTest extends TestCase
             new NormqueryClusterStatDto(200005, 222, 'кластер b', $date, 100, 10, 1, '50'),
         ];
 
-        $service = new WbStatsSyncService(
-            $this->createMock(CampaignRepository::class),
-            $stubApi,
-            $this->createEntityManagerMock(),
-        );
-
-        $service->syncCampaign($campaign);
+        $this->service($stubApi)->syncCampaign($campaign);
 
         $nmIds = array_column($stubApi->getNormqueryBidsCalls, 'nmId');
         sort($nmIds);
@@ -196,16 +168,25 @@ final class WbStatsSyncServiceBidsTest extends TestCase
             new NormqueryClusterBidDto(200006, 111222333, 'известный кластер', 4500),
         ];
 
-        $service = new WbStatsSyncService(
-            $this->createMock(CampaignRepository::class),
-            $stubApi,
-            $this->createEntityManagerMock(),
-        );
-
-        $service->syncCampaign($campaign);
+        $this->service($stubApi)->syncCampaign($campaign);
 
         $this->assertSame(4500, $cluster->getCurrentBidKopecks());
         $this->assertCount(1, $campaign->getClusters());
+    }
+
+    public function testSyncSkipsCampaignWithNonSyncableWbStatus(): void
+    {
+        $campaign = new Campaign(200007, 'paused status');
+        $campaign->setSeedNmId(1);
+        $campaign->setWbStatus(4); // ready, not in 7/9/11
+        $stubApi = new StubWbPromotionApiClient();
+        $stubApi->fullstats = [
+            new FullstatsCampaignDto(200007, 1, 1, 1, '1', '1', []),
+        ];
+
+        $this->service($stubApi)->syncCampaign($campaign);
+
+        $this->assertCount(0, $campaign->getClusters());
     }
 
     /**
@@ -221,14 +202,19 @@ final class WbStatsSyncServiceBidsTest extends TestCase
         return $bids;
     }
 
-    private function createEntityManagerMock(): EntityManagerInterface
+    private function service(StubWbPromotionApiClient $stubApi): WbStatsSyncService
     {
-        $repository = $this->createMock(EntityRepository::class);
-        $repository->method('findOneBy')->willReturn(null);
+        $campaignStats = $this->createStub(CampaignDailyStatRepository::class);
+        $campaignStats->method('findIndexedByDate')->willReturn([]);
+        $clusterStats = $this->createStub(ClusterDailyStatRepository::class);
+        $clusterStats->method('findIndexedByDate')->willReturn([]);
 
-        $entityManager = $this->createMock(EntityManagerInterface::class);
-        $entityManager->method('getRepository')->willReturn($repository);
-
-        return $entityManager;
+        return new WbStatsSyncService(
+            $this->createStub(CampaignRepository::class),
+            $campaignStats,
+            $clusterStats,
+            $stubApi,
+            $this->createStub(EntityManagerInterface::class),
+        );
     }
 }

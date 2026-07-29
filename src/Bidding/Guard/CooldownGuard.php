@@ -9,9 +9,14 @@ use App\Enum\BidAction;
 
 final class CooldownGuard implements BidGuardInterface
 {
-    public function check(Campaign $campaign, Cluster $cluster, BidIntent $intent, int $proposedBidKopecks): ?string
-    {
-        if ($intent->action === BidAction::Hold) {
+    public function check(
+        Campaign $campaign,
+        Cluster $cluster,
+        BidIntent $intent,
+        int $proposedBidKopecks,
+        \DateTimeImmutable $now,
+    ): ?string {
+        if ($intent->action === BidAction::Hold || $intent->action === BidAction::Pause) {
             return null;
         }
 
@@ -21,7 +26,7 @@ final class CooldownGuard implements BidGuardInterface
         }
 
         $cooldownEnds = $lastChange->modify(sprintf('+%d hours', $campaign->getCooldownHours()));
-        if ($cooldownEnds > new \DateTimeImmutable()) {
+        if ($cooldownEnds > $now) {
             return 'cooldown_active';
         }
 

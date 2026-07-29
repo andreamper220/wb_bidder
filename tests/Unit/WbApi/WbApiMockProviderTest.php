@@ -20,8 +20,16 @@ final class WbApiMockProviderTest extends TestCase
             ['кроссовки мужские', 'кроссовки черные', 'кроссовки бег'],
             $queries,
         );
-        $this->assertSame(5000, $data['bids'][0]['bid']);
-        $this->assertSame(8000, $data['bids'][1]['bid']);
-        $this->assertSame(12000, $data['bids'][2]['bid']);
+        $this->assertSame(5000, $data['bids'][0]['bid_kopecks']);
+        $this->assertSame(8000, $data['bids'][1]['bid_kopecks']);
+        $this->assertSame(12000, $data['bids'][2]['bid_kopecks']);
+    }
+
+    public function testGetNormqueryBidsEmptyForUnknownIds(): void
+    {
+        $provider = new WbApiMockProvider(dirname(__DIR__, 3));
+        $data = $provider->getNormqueryBids([['advertId' => 1, 'nmId' => 2]]);
+
+        $this->assertSame([], $data['bids']);
     }
 }

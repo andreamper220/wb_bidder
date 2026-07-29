@@ -52,6 +52,13 @@ class CampaignCrudController extends AbstractCrudController
                 'ID рекламной кампании в кабинете Wildberries (advertId). Используется для запросов fullstats, normquery и установки ставок.',
             ));
 
+        yield IntegerField::new('seedNmId')
+            ->setRequired(false)
+            ->setLabel(ColumnHelpLabel::make(
+                'Seed nmId',
+                'Артикул WB для первого sync, пока в кампании ещё нет кластеров. Без него sync не сможет запросить normquery/stats и обнаружить кластеры.',
+            ));
+
         yield BooleanField::new('active')
             ->setLabel(ColumnHelpLabel::make(
                 'Активна',
@@ -91,7 +98,20 @@ class CampaignCrudController extends AbstractCrudController
         yield IntegerField::new('metricsWindowDays')
             ->setLabel(ColumnHelpLabel::make(
                 'Окно (дней)',
-                'Сколько последних дней daily stats агрегируются для ROAS и CPA перед расчётом ставок.',
+                'Сколько последних завершённых дней daily stats агрегируются для ROAS и CPA перед расчётом ставок.',
+            ));
+
+        yield IntegerField::new('attributionLagDays')
+            ->setLabel(ColumnHelpLabel::make(
+                'Лаг атрибуции (дней)',
+                'Сколько последних календарных дней исключить из окна метрик (сегодня и незавершённая атрибуция заказов). 1 = не учитывать сегодня.',
+            ));
+
+        yield IntegerField::new('wbStatus')
+            ->setRequired(false)
+            ->setLabel(ColumnHelpLabel::make(
+                'WB status',
+                'Статус кампании в WB (7/9/11 — syncable для fullstats). Пусто = не фильтровать. Остальные статусы пропускаются при sync.',
             ));
 
         yield NumberField::new('restrictUpIfRoasBelow')
@@ -184,6 +204,12 @@ class CampaignCrudController extends AbstractCrudController
             ->setLabel(ColumnHelpLabel::make(
                 'Cooldown (ч)',
                 'Минимальный интервал между изменениями ставки на одном кластере. Предотвращает частые переключения.',
+            ));
+
+        yield IntegerField::new('minChangePct')
+            ->setLabel(ColumnHelpLabel::make(
+                'Мин. изменение %',
+                'Мёртвая зона по величине шага ставки: изменение меньше этого процента от текущей ставки → HOLD (below_dead_band).',
             ));
     }
 

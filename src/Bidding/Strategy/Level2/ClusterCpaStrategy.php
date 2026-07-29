@@ -11,6 +11,8 @@ use App\Metrics\ValueObject\ClusterMetrics;
 
 /**
  * Level 2 — CPA per search cluster (Pattern: Strategy).
+ *
+ * Dead zone is bilateral: HOLD when target−buffer ≤ CPA ≤ target+buffer.
  */
 final class ClusterCpaStrategy
 {
@@ -31,6 +33,8 @@ final class ClusterCpaStrategy
 
         $target = $campaign->getTargetCpa();
         $buffer = $campaign->getCpaBuffer();
+        $lower = Bc::sub($target, $buffer, 4);
+        $upper = Bc::add($target, $buffer, 4);
 
         if ($campaign->getPauseIfCpaAbove() !== null
             && Bc::comp($cpa, $campaign->getPauseIfCpaAbove(), 4) > 0
@@ -39,15 +43,11 @@ final class ClusterCpaStrategy
             return new BidProposal(BidAction::Pause, 'cpa_above_pause_threshold');
         }
 
-        if (Bc::comp($cpa, $target, 4) === 0 || Bc::comp(Bc::sub($cpa, $target, 4), '0', 4) === 0) {
-            return new BidProposal(BidAction::Hold, 'cpa_equals_target');
-        }
-
-        if (Bc::comp($cpa, Bc::add($target, $buffer, 4), 4) > 0) {
+        if (Bc::comp($cpa, $upper, 4) > 0) {
             return new BidProposal(BidAction::Down, 'cpa_above_target');
         }
 
-        if (Bc::comp($cpa, $target, 4) < 0) {
+        if (Bc::comp($cpa, $lower, 4) < 0) {
             return new BidProposal(BidAction::Up, 'cpa_below_target');
         }
 

@@ -8,5 +8,11 @@ use App\Entity\Cluster;
 
 interface BidGuardInterface
 {
-    public function check(Campaign $campaign, Cluster $cluster, BidIntent $intent, int $proposedBidKopecks): ?string;
+    public function check(
+        Campaign $campaign,
+        Cluster $cluster,
+        BidIntent $intent,
+        int $proposedBidKopecks,
+        \DateTimeImmutable $now,
+    ): ?string;
 }

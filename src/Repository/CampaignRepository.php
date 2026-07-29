@@ -19,4 +19,10 @@ class CampaignRepository extends ServiceEntityRepository
     {
         return $this->findBy(['biddingEnabled' => true, 'active' => true]);
     }
+
+    /** @return Campaign[] */
+    public function findActive(): array
+    {
+        return $this->findBy(['active' => true]);
+    }
 }

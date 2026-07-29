@@ -8,6 +8,8 @@ use App\WbApi\WbPromotionApiAdapter;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WbPromotionApiAdapterTest extends TestCase
 {
@@ -15,86 +17,127 @@ final class WbPromotionApiAdapterTest extends TestCase
     {
         $adapter = $this->createAdapter(useMock: true);
 
-        $bids = $adapter->getNormqueryBids(100001, 987654321);
+        $bids = $adapter->getNormqueryBids([
+            ['advertId' => 100001, 'nmId' => 987654321],
+        ]);
 
         $this->assertNotEmpty($bids);
-        $normQueries = array_map(static fn ($dto) => $dto->normQuery, $bids);
-        $this->assertContains('кроссовки мужские', $normQueries);
-        $this->assertContains('кроссовки черные', $normQueries);
-        $this->assertContains('кроссовки бег', $normQueries);
+        $this->assertSame(5000, $bids[0]->bidKopecks);
     }
 
-    public function testGetNormqueryBidsInLiveModeCallsWbApi(): void
+    public function testMockReturnsEmptyForUnknownCampaign(): void
+    {
+        $adapter = $this->createAdapter(useMock: true);
+
+        $bids = $adapter->getNormqueryBids([
+            ['advertId' => 999, 'nmId' => 1],
+        ]);
+
+        $this->assertSame([], $bids);
+    }
+
+    public function testSetClusterBidsSendsKopecksViaV1(): void
     {
         $request = null;
         $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$request) {
             $request = compact('method', 'url', 'options');
 
-            return new MockResponse(json_encode([
-                'bids' => [
-                    [
-                        'advert_id' => 1825035,
-                        'nm_id' => 983512347,
-                        'norm_query' => 'тестовая фраза',
-                        'bid' => 1234,
-                    ],
-                ],
-            ], JSON_THROW_ON_ERROR));
+            return new MockResponse('{"success":[],"failed":[]}');
         });
 
-        $adapter = new WbPromotionApiAdapter(
-            $client,
-            new WbApiResponseMapper(),
-            new WbApiMockProvider(sys_get_temp_dir()),
-            useMock: false,
-            baseUrl: 'https://advert-api.wildberries.ru',
-            apiKey: 'test-token',
-        );
-
-        $bids = $adapter->getNormqueryBids(1825035, 983512347);
+        $adapter = $this->createAdapter(useMock: false, client: $client);
+        $adapter->setClusterBids([[
+            'advertId' => 1825035,
+            'nmId' => 983512347,
+            'normQuery' => 'фраза',
+            'bidKopecks' => 15000,
+        ]]);
 
         $this->assertNotNull($request);
         $this->assertSame('POST', $request['method']);
-        $this->assertStringEndsWith('/adv/v0/normquery/get-bids', $request['url']);
-        $payload = isset($request['options']['json'])
-            ? $request['options']['json']
-            : json_decode((string) ($request['options']['body'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
-        $this->assertSame(
-            ['items' => [['advert_id' => 1825035, 'nm_id' => 983512347]]],
-            $payload,
-        );
-        $this->assertCount(1, $bids);
-        $this->assertSame('тестовая фраза', $bids[0]->normQuery);
-        $this->assertSame(1234, $bids[0]->bidKopecks);
+        $this->assertStringEndsWith('/api/advert/v1/normquery/bids', $request['url']);
+        $payload = $request['options']['json'] ?? json_decode((string) ($request['options']['body'] ?? ''), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame([
+            'bids' => [[
+                'advertId' => 1825035,
+                'nmId' => 983512347,
+                'normQuery' => 'фраза',
+                'bidMinorUnits' => 15000,
+            ]],
+        ], $payload);
     }
 
-    public function testGetNormqueryBidsInLiveModeThrowsOnNonOkResponse(): void
+    public function testGetFullstatsBatchesIds(): void
     {
-        $client = new MockHttpClient(static fn () => new MockResponse('error', ['http_code' => 500]));
-        $adapter = new WbPromotionApiAdapter(
-            $client,
-            new WbApiResponseMapper(),
-            new WbApiMockProvider(sys_get_temp_dir()),
-            useMock: false,
-            baseUrl: 'https://advert-api.wildberries.ru',
-            apiKey: 'test-token',
-        );
+        $request = null;
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$request) {
+            $request = compact('method', 'url', 'options');
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('WB normquery get-bids request failed');
+            return new MockResponse('[]');
+        });
 
-        $adapter->getNormqueryBids(1, 2);
+        $adapter = $this->createAdapter(useMock: false, client: $client);
+        $adapter->getFullstats([1, 2, 3], new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-07'));
+
+        $this->assertSame('1,2,3', $request['options']['query']['ids']);
     }
 
-    private function createAdapter(bool $useMock): WbPromotionApiAdapter
+    public function testGetNormqueryStatsUsesV0Path(): void
     {
+        $request = null;
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$request) {
+            $request = compact('method', 'url', 'options');
+
+            return new MockResponse(json_encode(['items' => []], JSON_THROW_ON_ERROR));
+        });
+
+        $adapter = $this->createAdapter(useMock: false, client: $client);
+        $adapter->getNormqueryStats(
+            [['advertId' => 1, 'nmId' => 2]],
+            new \DateTimeImmutable('2026-01-01'),
+            new \DateTimeImmutable('2026-01-07'),
+        );
+
+        $this->assertStringEndsWith('/adv/v0/normquery/stats', $request['url']);
+    }
+
+    public function testDeleteClusterBidsCallsDeleteEndpoint(): void
+    {
+        $request = null;
+        $client = new MockHttpClient(function (string $method, string $url, array $options) use (&$request) {
+            $request = compact('method', 'url', 'options');
+
+            return new MockResponse('{"status":"ok"}');
+        });
+
+        $adapter = $this->createAdapter(useMock: false, client: $client);
+        $adapter->deleteClusterBids([['advertId' => 1, 'nmId' => 2, 'normQuery' => 'фраза']]);
+
+        $this->assertSame('DELETE', $request['method']);
+        $this->assertStringEndsWith('/adv/v0/normquery/bids', $request['url']);
+    }
+
+    private function createAdapter(bool $useMock, ?MockHttpClient $client = null): WbPromotionApiAdapter
+    {
+        $storage = new InMemoryStorage();
+        $config = [
+            'id' => 'test',
+            'policy' => 'token_bucket',
+            'limit' => 1000,
+            'rate' => ['interval' => '1 second', 'amount' => 1000],
+        ];
+
         return new WbPromotionApiAdapter(
-            new MockHttpClient(),
+            $client ?? new MockHttpClient(),
             new WbApiResponseMapper(),
             new WbApiMockProvider(dirname(__DIR__, 3)),
             useMock: $useMock,
             baseUrl: 'https://advert-api.wildberries.ru',
-            apiKey: '',
+            apiKey: 'test-token',
+            fullstatsLimiter: new RateLimiterFactory($config, $storage),
+            normqueryStatsLimiter: new RateLimiterFactory($config, $storage),
+            normqueryBidsReadLimiter: new RateLimiterFactory($config, $storage),
+            normqueryBidsWriteLimiter: new RateLimiterFactory($config, $storage),
         );
     }
 }

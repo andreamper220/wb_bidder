@@ -1,17 +1,42 @@
-# Architectural patterns
+# Архитектурные паттерны
 
-| Pattern | Implementation |
-|---------|----------------|
-| **Adapter** | `WbPromotionApiAdapter` wraps HttpClient + mock mode |
-| **DTO** | `src/WbApi/Dto/*` |
-| **Strategy** | `ClusterCpaStrategy` (Level 2 CPA proposals) |
-| **Pipeline** | `BiddingPipeline` — aggregate → mode → propose → merge → guard |
-| **Chain of Responsibility** | `BidGuardChain` + `MinMaxBidGuard`, `CooldownGuard` |
-| **Command** | Messenger messages + Console commands |
-| **Repository** | Doctrine repositories in `src/Repository/` |
+Паттерны применены там, где они решают конкретную задачу проекта. Ниже — не перечень, а
+обоснование: что было бы, если бы паттерна не было.
 
-## Two-level bidding
+| Паттерн | Где | Какую задачу решает |
+|---|---|---|
+| **Adapter** | `WbPromotionApiAdapter`, `WbApiResponseMapper` | Изолирует единственное место, где живут HTTP, версии эндпоинтов и единицы измерения. Без изоляции детали чужого API расползаются по домену, и смена версии WB превращается в правку десятка файлов |
+| **DTO** | `src/WbApi/Dto/` | `readonly`-объекты вместо ассоциативных массивов. Опечатка в ключе массива обнаруживается в бою, опечатка в имени свойства — при разборе кода |
+| **Strategy** | `ClusterCpaStrategy` | Правило принятия решения — заменяемая деталь. Добавление стратегии по ROAS-кластерам или по доле выигранных аукционов не должно трогать пайплайн |
+| **Chain of Responsibility** | `BidGuardChain` + гарды | Предохранители добавляются, не изменяя существующий код и не разрастаясь в лестницу `if` внутри пайплайна. Каждый гард отвечает на один вопрос и возвращает код причины, сразу пригодный для журнала |
+| **Pipeline** | `BiddingPipeline` | Фиксирует порядок шагов: агрегация → режим → предложение → слияние → расчёт → гарды → решение. Порядок здесь — часть спецификации, а не деталь реализации |
+| **Command / Message** | `src/Message/`, `src/MessageHandler/`, `src/Command/` | Разделяет этапы с разными лимитами API и разной ценой повтора (см. [QUEUES.md](QUEUES.md)) |
+| **Repository** | `src/Repository/` | Запросы к статистике в одном месте; окно метрик задаётся одним методом, а не повторяется в каждом вызывающем |
+| **Value Object** | `BidProposal`, `BidIntent`, `CampaignMetrics`, `ClusterMetrics` | Разделение «что предложила стратегия» и «что осталось после ограничений». Именно оно делает журнал решений диагностируемым |
 
-1. `CampaignModeResolver` — Level 1 ROAS → DEFENSIVE / BALANCED / GROWTH
-2. `ClusterCpaStrategy` — Level 2 CPA proposal
-3. `CampaignModeMerger` — filter proposal by mode
+## Разделение `BidProposal` и `BidIntent`
+
+Выглядит избыточным (у обоих есть поле `action`), но несёт основную диагностическую ценность
+системы. `BidProposal` — что предложила стратегия по CPA. `BidIntent` — что осталось после режима
+кампании, плюс причина ограничения.
+
+Без этого разделения в журнале осталось бы только «`HOLD`», и вопрос «сколько роста мы не сделали
+из-за защитного режима» стал бы неотвечаемым. С ним — считается запросом по `proposal_action = 'up'
+AND final_action = 'hold'`.
+
+## Чистота домена
+
+`src/Bidding/Strategy`, `Guard`, `Merge` и `src/Metrics` не зависят от HTTP, Doctrine и системного
+времени. Это не эстетическое требование: чистота — предпосылка для property-тестов инвариантов
+(гейт G4). Как только в гард попадает обращение к БД, проверка инварианта «ставка всегда в
+диапазоне» на тысяче сгенерированных входов превращается в интеграционный тест, который никто не
+станет прогонять на каждом коммите.
+
+Ограничение зафиксировано в [`.cursor/rules/20-architecture-boundaries.mdc`](../.cursor/rules/20-architecture-boundaries.mdc)
+и проверяется grep-гейтом в [`scripts/gates.sh`](../scripts/gates.sh).
+
+## Где паттерн не сработал (исторически)
+
+`BidGuardChain` спроектирован правильно, но раньше `MinMaxBidGuard` был недостижим: клампинг
+выполнялся в `BidCalculator` до цепочки. Сейчас калькулятор не клампит — границы проверяет гард.
+Случай остаётся учебным: каждый класс по отдельности был корректен, дефект жил в композиции.

@@ -1,0 +1,80 @@
+name: CI
+
+# Гейты G0–G2 из docs/02-AI-WORKFLOW.md.
+# G3 (контрактные тесты) и G4 (property-тесты инвариантов) появятся здесь же
+# отдельными шагами — сейчас они не реализованы, см. docs/KNOWN-ISSUES.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gates:
+    name: G0–G2
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: wb_bidder_test
+          POSTGRES_USER: wb
+          POSTGRES_PASSWORD: wb
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U wb"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      APP_ENV: test
+      WB_API_MOCK: '1'
+      DATABASE_URL: postgresql://wb:wb@127.0.0.1:5432/wb_bidder?serverVersion=16&charset=utf8
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: pdo_pgsql, intl, bcmath, redis
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: G0 — локальные гейты (паттерны, синтаксис, зависимости)
+        run: bash scripts/gates.sh --no-tests
+
+      - name: Подготовка тестовой БД
+        run: |
+          php bin/console doctrine:database:create --env=test --if-not-exists
+          php bin/console doctrine:migrations:migrate --env=test --no-interaction
+
+      - name: G2 — тесты
+        run: php bin/phpunit
+
+  review-required:
+    name: G5 — напоминание о ревью
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Проверить, затронуты ли зоны обязательного ревью
+        run: |
+          BASE="origin/${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only "$BASE"...HEAD)
+          SENSITIVE=$(echo "$CHANGED" | grep -E '^(src/Bidding/|src/WbApi/|migrations/|config/)' || true)
+          if [ -n "$SENSITIVE" ]; then
+            echo "::warning::Затронуты зоны обязательного ревью человеком (гейт G5):"
+            echo "$SENSITIVE"
+            echo "Чеклист: docs/03-AI-REVIEW.md"
+          else
+            echo "Зоны обязательного ревью не затронуты."
+          fi

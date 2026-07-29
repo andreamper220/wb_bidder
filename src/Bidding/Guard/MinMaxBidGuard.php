@@ -9,9 +9,14 @@ use App\Enum\BidAction;
 
 final class MinMaxBidGuard implements BidGuardInterface
 {
-    public function check(Campaign $campaign, Cluster $cluster, BidIntent $intent, int $proposedBidKopecks): ?string
-    {
-        if ($intent->action === BidAction::Hold) {
+    public function check(
+        Campaign $campaign,
+        Cluster $cluster,
+        BidIntent $intent,
+        int $proposedBidKopecks,
+        \DateTimeImmutable $now,
+    ): ?string {
+        if ($intent->action === BidAction::Hold || $intent->action === BidAction::Pause) {
             return null;
         }
 

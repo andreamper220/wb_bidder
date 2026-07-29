@@ -17,14 +17,19 @@ final class BidGuardChain
     {
     }
 
-    public function apply(Campaign $campaign, Cluster $cluster, BidIntent $intent, int $proposedBidKopecks): BidIntent
-    {
+    public function apply(
+        Campaign $campaign,
+        Cluster $cluster,
+        BidIntent $intent,
+        int $proposedBidKopecks,
+        \DateTimeImmutable $now,
+    ): BidIntent {
         if ($intent->action === BidAction::Hold || $intent->action === BidAction::Pause) {
             return $intent;
         }
 
         foreach ($this->guards as $guard) {
-            $reason = $guard->check($campaign, $cluster, $intent, $proposedBidKopecks);
+            $reason = $guard->check($campaign, $cluster, $intent, $proposedBidKopecks, $now);
             if ($reason !== null) {
                 return new BidIntent(BidAction::Hold, $reason, $intent->originalProposal, $intent->modeFilterReason);
             }

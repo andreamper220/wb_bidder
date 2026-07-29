@@ -1,0 +1,47 @@
+services:
+  nginx:
+    ports: !override
+      - "127.0.0.1:8199:80"
+
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+  redis:
+    ports: !reset []
+
+  app:
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DEFAULT_URI: https://bidder.netvolk.online
+      DATABASE_URL: postgresql://wb:${POSTGRES_PASSWORD}@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379
+      WB_API_MOCK: "1"
+      WB_API_KEY: ""
+      WB_API_BASE_URL: https://advert-api.wildberries.ru
+
+  worker-sync:
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: postgresql://wb:${POSTGRES_PASSWORD}@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379
+      WB_API_MOCK: "1"
+
+  worker-bidding:
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: postgresql://wb:${POSTGRES_PASSWORD}@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379
+      WB_API_MOCK: "1"
+
+  worker-execution:
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: postgresql://wb:${POSTGRES_PASSWORD}@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379
+      WB_API_MOCK: "1"

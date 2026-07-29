@@ -2,13 +2,10 @@
 
 namespace App\Tests\Unit\Bidding;
 
-use App\Bidding\Merge\CampaignModeMerger;
 use App\Bidding\Strategy\Level2\ClusterCpaStrategy;
-use App\Bidding\ValueObject\BidProposal;
 use App\Entity\Campaign;
 use App\Entity\Cluster;
 use App\Enum\BidAction;
-use App\Enum\CampaignMode;
 use App\Metrics\ValueObject\ClusterMetrics;
 use PHPUnit\Framework\TestCase;
 
@@ -45,16 +42,18 @@ final class ClusterCpaStrategyTest extends TestCase
         $this->assertSame('cpa_below_target', $proposal->reason);
     }
 
-    public function testCpaEqualsTargetHolds(): void
+    public function testCpaWithinBufferHolds(): void
     {
         $campaign = $this->campaign(targetCpa: '200');
+        $campaign->setCpaBuffer('20');
         $cluster = new Cluster($campaign, 1, 'test');
-        $metrics = new ClusterMetrics(1000, 100, 5, '1000.00', 7);
+        // CPA = 190 — inside [180, 220]
+        $metrics = new ClusterMetrics(1000, 100, 5, '950.00', 7);
 
         $proposal = $this->strategy->propose($campaign, $cluster, $metrics);
 
         $this->assertSame(BidAction::Hold, $proposal->action);
-        $this->assertSame('cpa_equals_target', $proposal->reason);
+        $this->assertSame('cpa_within_buffer', $proposal->reason);
     }
 
     public function testOrdersBelowMinSkips(): void
@@ -73,6 +72,7 @@ final class ClusterCpaStrategyTest extends TestCase
     {
         $campaign = new Campaign(1, 'test');
         $campaign->setTargetCpa($targetCpa);
+        $campaign->setCpaBuffer('20');
         $campaign->setMinOrders($minOrders);
         $campaign->setMinImpressions(100);
 

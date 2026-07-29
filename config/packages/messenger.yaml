@@ -9,18 +9,33 @@ framework:
                     stream: wb_sync
                     group: wb_sync
                     consumer: wb_sync
+                retry_strategy:
+                    max_retries: 5
+                    delay: 20000
+                    multiplier: 2
+                    max_delay: 300000
             wb_bidding:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 options:
                     stream: wb_bidding
                     group: wb_bidding
                     consumer: wb_bidding
+                retry_strategy:
+                    max_retries: 3
+                    delay: 1000
+                    multiplier: 2
+                    max_delay: 10000
             wb_execution:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 options:
                     stream: wb_execution
                     group: wb_execution
                     consumer: wb_execution
+                retry_strategy:
+                    max_retries: 5
+                    delay: 2000
+                    multiplier: 2
+                    max_delay: 60000
             failed:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
                 options:

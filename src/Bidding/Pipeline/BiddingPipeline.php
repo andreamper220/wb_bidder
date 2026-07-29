@@ -17,6 +17,10 @@ use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Pattern: Pipeline — aggregate → mode → propose → merge → guard → decision.
+ *
+ * Side effects on cluster state (pause, bid) happen only in BidExecutionService,
+ * never here — including when dry-run is false. This keeps dry-run free of mutations
+ * outside bid_decisions.
  */
 final class BiddingPipeline
 {
@@ -32,11 +36,14 @@ final class BiddingPipeline
     }
 
     /** @return BidDecision[] */
-    public function run(Campaign $campaign, bool $dryRun = false): array
+    public function run(Campaign $campaign, bool $dryRun = false, ?\DateTimeImmutable $now = null): array
     {
         if (!$campaign->isBiddingEnabled() || !$campaign->isActive()) {
             return [];
         }
+
+        $now ??= new \DateTimeImmutable();
+        $effectiveDryRun = $dryRun || $campaign->isDryRun();
 
         $campaignMetrics = $this->metricsAggregator->aggregateCampaign($campaign);
         $mode = $campaign->isLevel1Enabled()
@@ -56,6 +63,12 @@ final class BiddingPipeline
             );
 
             $proposal = $this->clusterCpaStrategy->propose($campaign, $cluster, $clusterMetrics);
+
+            // Stay paused while CPA still warrants PAUSE; otherwise resume via normal path.
+            if ($cluster->isPaused() && $proposal->action === BidAction::Pause) {
+                continue;
+            }
+
             $intent = $this->campaignModeMerger->merge($mode, $proposal);
 
             $newBid = $this->bidCalculator->calculateNewBid(
@@ -65,13 +78,9 @@ final class BiddingPipeline
                 $intent->action,
             );
 
-            $guardedIntent = $this->bidGuardChain->apply($campaign, $cluster, $intent, $newBid);
+            $guardedIntent = $this->bidGuardChain->apply($campaign, $cluster, $intent, $newBid, $now);
             if ($guardedIntent->action === BidAction::Hold) {
                 $newBid = $cluster->getCurrentBidKopecks();
-            }
-
-            if ($intent->action === BidAction::Pause) {
-                $cluster->setPaused(true);
             }
 
             $reason = $this->buildReason($mode, $proposal, $guardedIntent, $campaignMetrics, $clusterMetrics);
@@ -89,7 +98,7 @@ final class BiddingPipeline
 
             if ($guardedIntent->action === BidAction::Hold && $proposal->action !== BidAction::Hold) {
                 $decision->setStatus(BidDecisionStatus::Skipped);
-            } elseif ($dryRun || $campaign->isDryRun()) {
+            } elseif ($effectiveDryRun) {
                 $decision->setStatus(BidDecisionStatus::Skipped);
             } else {
                 $decision->setStatus(BidDecisionStatus::Pending);
@@ -105,7 +114,7 @@ final class BiddingPipeline
     }
 
     private function buildReason(
-        CampaignMode $mode,
+        \App\Enum\CampaignMode $mode,
         \App\Bidding\ValueObject\BidProposal $proposal,
         \App\Bidding\ValueObject\BidIntent $intent,
         \App\Metrics\ValueObject\CampaignMetrics $campaignMetrics,

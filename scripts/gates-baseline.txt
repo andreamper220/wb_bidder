@@ -1,0 +1,14 @@
+# Известные нарушения правил проекта, зафиксированные на момент ревизии прототипа.
+#
+# Формат: <путь к файлу>:<id проверки из scripts/gates.sh>
+#
+# Каждая строка означает: нарушение осознанное, описано в docs/KNOWN-ISSUES.md и требует
+# отдельной задачи. Новые нарушения тех же правил будут блокировать гейт G0.
+# Строка удаляется из этого файла в том же PR, где устраняется причина.
+
+# Демо-стенд и сидер: демо-значения здесь уместны
+src/Demo/DemoStandService.php:fixture-magic
+src/Command/WbSeedDemoCommand.php:fixture-magic
+src/Admin/ProductionReadinessService.php:fixture-magic
+# Mock отдаёт фикстуры только для demo advert/nm
+src/WbApi/WbApiMockProvider.php:fixture-magic

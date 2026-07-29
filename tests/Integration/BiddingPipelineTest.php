@@ -25,6 +25,7 @@ final class BiddingPipelineTest extends KernelTestCase
 
         $campaign = new Campaign(random_int(910001, 919999), 'integration test');
         $campaign->setBiddingEnabled(true);
+        $campaign->setAttributionLagDays(0);
         $campaign->setRestrictUpIfRoasBelow('3.0');
         $campaign->setTargetCpa('200');
         $campaign->setMinOrders(3);
@@ -64,6 +65,7 @@ final class BiddingPipelineTest extends KernelTestCase
 
         $campaign = new Campaign(random_int(920001, 929999), 'growth test');
         $campaign->setBiddingEnabled(true);
+        $campaign->setAttributionLagDays(0);
         $campaign->setRestrictUpIfRoasBelow('1.0');
         $campaign->setAllowUpIfRoasAbove('2.0');
         $campaign->setTargetCpa('200');

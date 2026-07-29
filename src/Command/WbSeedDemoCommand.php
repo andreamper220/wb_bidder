@@ -35,6 +35,7 @@ final class WbSeedDemoCommand extends Command
 
         $campaign = new Campaign(100001, 'Demo кроссовки');
         $campaign->setBiddingEnabled(true);
+        $campaign->setSeedNmId(987654321);
         $campaign->setRestrictUpIfRoasBelow('3.0');
         $campaign->setAllowUpIfRoasAbove('5.0');
 

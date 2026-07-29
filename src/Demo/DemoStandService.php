@@ -96,6 +96,7 @@ final class DemoStandService
         $campaign = new Campaign(self::DEMO_WB_ADVERT_ID, 'Demo кроссовки');
         $campaign->setBiddingEnabled(true);
         $campaign->setDryRun(true);
+        $campaign->setSeedNmId(987654321);
         $campaign->setRestrictUpIfRoasBelow($restrictUpIfRoasBelow);
         $campaign->setAllowUpIfRoasAbove('5.0');
         $campaign->setTargetCpa('500.00');

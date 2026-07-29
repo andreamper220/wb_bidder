@@ -1,0 +1,44 @@
+# see https://symfony.com/doc/current/rate_limiter.html
+framework:
+    rate_limiter:
+        # Limits are per seller account (shared Redis key). Values from docs/WB-API-LIMITS.md.
+        wb_fullstats:
+            policy: token_bucket
+            limit: 3
+            rate: { interval: '20 seconds', amount: 1 }
+            cache_pool: cache.rate_limiter
+        wb_normquery_stats:
+            policy: token_bucket
+            limit: 10
+            rate: { interval: '6 seconds', amount: 1 }
+            cache_pool: cache.rate_limiter
+        wb_normquery_bids_read:
+            policy: token_bucket
+            limit: 300
+            rate: { interval: '200 milliseconds', amount: 1 }
+            cache_pool: cache.rate_limiter
+        wb_normquery_bids_write:
+            policy: token_bucket
+            limit: 120
+            rate: { interval: '500 milliseconds', amount: 1 }
+            cache_pool: cache.rate_limiter
+
+when@test:
+    framework:
+        rate_limiter:
+            wb_fullstats:
+                policy: token_bucket
+                limit: 1000
+                rate: { interval: '1 second', amount: 1000 }
+            wb_normquery_stats:
+                policy: token_bucket
+                limit: 1000
+                rate: { interval: '1 second', amount: 1000 }
+            wb_normquery_bids_read:
+                policy: token_bucket
+                limit: 1000
+                rate: { interval: '1 second', amount: 1000 }
+            wb_normquery_bids_write:
+                policy: token_bucket
+                limit: 1000
+                rate: { interval: '1 second', amount: 1000 }

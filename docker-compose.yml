@@ -11,7 +11,7 @@ services:
       APP_TIMEZONE: Europe/Moscow
       TZ: Europe/Moscow
       DATABASE_URL: postgresql://wb:wb@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
-      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379
       WB_API_MOCK: "1"
       WB_API_KEY: ""
       WB_API_BASE_URL: https://advert-api.wildberries.ru
@@ -65,7 +65,7 @@ services:
       APP_TIMEZONE: Europe/Moscow
       TZ: Europe/Moscow
       DATABASE_URL: postgresql://wb:wb@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
-      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379
       WB_API_MOCK: "1"
     depends_on:
       - app
@@ -86,7 +86,7 @@ services:
       APP_TIMEZONE: Europe/Moscow
       TZ: Europe/Moscow
       DATABASE_URL: postgresql://wb:wb@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
-      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379
       WB_API_MOCK: "1"
     depends_on:
       - app
@@ -107,7 +107,7 @@ services:
       APP_TIMEZONE: Europe/Moscow
       TZ: Europe/Moscow
       DATABASE_URL: postgresql://wb:wb@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
-      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379
       WB_API_MOCK: "1"
     depends_on:
       - app

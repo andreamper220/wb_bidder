@@ -18,7 +18,7 @@ final readonly class CampaignMetrics
 
     public function roas(): ?string
     {
-        if ((float) $this->spend <= 0) {
+        if (Bc::comp($this->spend, '0', 2) <= 0) {
             return null;
         }
 

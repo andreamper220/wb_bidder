@@ -85,11 +85,20 @@ final class WbApiResponseMapper
                 continue;
             }
 
+            // Prefer explicit kopecks. Plain `bid` on v0 is whole rubles → convert.
+            if (isset($item['bid_kopecks']) || isset($item['bidKopecks'])) {
+                $bidKopecks = (int) ($item['bid_kopecks'] ?? $item['bidKopecks']);
+            } elseif (isset($item['bid'])) {
+                $bidKopecks = (int) $item['bid'] * 100;
+            } else {
+                $bidKopecks = 0;
+            }
+
             $result[] = new NormqueryClusterBidDto(
                 (int) ($item['advertId'] ?? $item['advert_id'] ?? 0),
                 (int) ($item['nmId'] ?? $item['nm_id'] ?? 0),
                 $normQuery,
-                (int) ($item['bid'] ?? $item['bidKopecks'] ?? 0),
+                $bidKopecks,
             );
         }
 

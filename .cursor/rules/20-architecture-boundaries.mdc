@@ -1,0 +1,39 @@
+---
+description: Границы слоёв и чистота домена
+globs: src/**/*.php
+alwaysApply: true
+---
+
+# Границы слоёв
+
+Стратегии и предохранители обязаны быть чистыми функциями над значениями. Это не эстетика:
+именно чистота позволяет проверять их инварианты перебором, а не примерами.
+
+## Разрешённые зависимости
+
+| Слой | Может зависеть от |
+|---|---|
+| `src/WbApi/` | HttpClient, DTO, маппер |
+| `src/Sync/` | `WbApi`, Doctrine, сущности |
+| `src/Metrics/` | сущности, репозитории (только чтение), value objects |
+| `src/Bidding/Strategy/`, `Guard/`, `Merge/` | сущности, value objects, enum — **и больше ничего** |
+| `src/Bidding/Pipeline/` | перечисленное выше + Doctrine (запись решений — его задача) |
+| `src/Service/`, `src/MessageHandler/` | всё перечисленное |
+
+## Запрещено
+
+- `HttpClientInterface` вне `src/WbApi/`.
+- `EntityManagerInterface` в `src/Bidding/Strategy/`, `Guard/`, `Merge/` и в `src/Metrics/`.
+  Единственное исключение — `src/Bidding/Pipeline/`.
+- `new \DateTimeImmutable()` внутри `src/Bidding/Strategy/` и `src/Bidding/Guard/` —
+  текущее время передаётся аргументом.
+- Массивы из `$response->toArray()` за пределами `src/WbApi/` — только DTO.
+- Состояние (изменяемые поля) в стратегиях и гардах.
+
+```php
+// ❌ ПЛОХО — гард сам берёт время, тест придётся делать интеграционным
+if ($cluster->getLastBidChangeAt()->modify('+6 hours') > new \DateTimeImmutable()) {
+
+// ✅ ХОРОШО — время как аргумент, гард остаётся чистым
+public function check(Campaign $c, Cluster $cl, BidIntent $i, int $bid, \DateTimeImmutable $now): ?string
+```
