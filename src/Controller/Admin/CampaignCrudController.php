@@ -4,11 +4,14 @@ namespace App\Controller\Admin;
 
 use App\Admin\ColumnHelpLabel;
 use App\Entity\Campaign;
+use App\Service\CampaignRemovalService;
+use Doctrine\ORM\EntityManagerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Crud;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
 use EasyCorp\Bundle\EasyAdminBundle\Field\BooleanField;
+use EasyCorp\Bundle\EasyAdminBundle\Field\DateTimeField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\FormField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\IntegerField;
 use EasyCorp\Bundle\EasyAdminBundle\Field\NumberField;
@@ -26,7 +29,9 @@ class CampaignCrudController extends AbstractCrudController
         return $crud
             ->setEntityLabelInSingular('Кампания')
             ->setEntityLabelInPlural('Кампании')
-            ->setDefaultSort(['id' => 'DESC']);
+            ->setDefaultSort(['id' => 'DESC'])
+            ->setTimezone('Europe/Moscow')
+            ->setDateTimeFormat('dd.MM.yyyy HH:mm', DateTimeField::FORMAT_NONE);
     }
 
     public function configureFields(string $pageName): iterable
@@ -208,5 +213,17 @@ class CampaignCrudController extends AbstractCrudController
     public function configureActions(Actions $actions): Actions
     {
         return $actions;
+    }
+
+    public function deleteEntity(EntityManagerInterface $entityManager, object $entityInstance): void
+    {
+        if ($entityInstance instanceof Campaign) {
+            $this->container->get(CampaignRemovalService::class)->delete($entityInstance);
+
+            return;
+        }
+
+        $entityManager->remove($entityInstance);
+        $entityManager->flush();
     }
 }

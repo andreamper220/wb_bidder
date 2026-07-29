@@ -28,7 +28,9 @@ class BidDecisionCrudController extends AbstractCrudController
             ->setEntityLabelInSingular('Решение')
             ->setEntityLabelInPlural('История ставок')
             ->setDefaultSort(['createdAt' => 'DESC'])
-            ->setSearchFields(['reason']);
+            ->setSearchFields(['reason'])
+            ->setTimezone('Europe/Moscow')
+            ->setDateTimeFormat('dd.MM.yyyy HH:mm', DateTimeField::FORMAT_NONE);
     }
 
     public function configureFields(string $pageName): iterable

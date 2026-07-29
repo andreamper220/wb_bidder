@@ -4,7 +4,9 @@ namespace App\Controller\Admin;
 
 use App\Admin\DashboardPanelService;
 use App\Demo\DemoStandService;
+use App\Repository\CampaignRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
+use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
 use EasyCorp\Bundle\EasyAdminBundle\Config\Dashboard;
 use EasyCorp\Bundle\EasyAdminBundle\Config\MenuItem;
 use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractDashboardController;
@@ -22,6 +24,7 @@ class DashboardController extends AbstractDashboardController
         private readonly AdminUrlGenerator $adminUrlGenerator,
         private readonly DemoStandService $demoStandService,
         private readonly RequestStack $requestStack,
+        private readonly CampaignRepository $campaignRepository,
     ) {
     }
 
@@ -34,11 +37,22 @@ class DashboardController extends AbstractDashboardController
             DemoStandService::DEFAULT_RESTRICT_UP_IF_ROAS_BELOW,
         ) ?? DemoStandService::DEFAULT_RESTRICT_UP_IF_ROAS_BELOW);
 
+        $demoCampaign = $this->campaignRepository->findOneBy(['wbAdvertId' => DemoStandService::DEMO_WB_ADVERT_ID]);
+        $demoCampaignDetailUrl = null;
+        if ($demoCampaign?->getId() !== null) {
+            $demoCampaignDetailUrl = $this->adminUrlGenerator
+                ->setController(CampaignCrudController::class)
+                ->setAction(Action::DETAIL)
+                ->setEntityId($demoCampaign->getId())
+                ->generateUrl();
+        }
+
         return $this->render('admin/dashboard.html.twig', [
             'panel' => $panel,
             'restrictUpDefault' => $restrictDefault,
             'demoRoas' => '4.0',
             'allowUpDefault' => '5.0',
+            'demoCampaignActive' => $demoCampaign !== null,
             'urls' => [
                 'campaigns' => $this->adminUrlGenerator->setController(CampaignCrudController::class)->generateUrl(),
                 'decisions' => $this->adminUrlGenerator->setController(BidDecisionCrudController::class)->generateUrl(),
@@ -47,6 +61,7 @@ class DashboardController extends AbstractDashboardController
                     ->setAction('new')
                     ->generateUrl(),
                 'demoStand' => $this->generateUrl('admin_demo_stand'),
+                'demoCampaignDetail' => $demoCampaignDetailUrl,
             ],
         ]);
     }
@@ -72,13 +87,10 @@ class DashboardController extends AbstractDashboardController
             $this->addFlash(
                 'success',
                 sprintf(
-                    'Демо-стенд готов: кампания «%s» (id=%d), режим %s, ROAS %s, restrict_up=%s, %d решений (dry-run).',
-                    $result->campaignName,
-                    $result->campaignId,
+                    'Демо-стенд готов (%d решений, режим %s, ROAS %s). Прокрутите страницу вниз — KPI, таблица кампаний и решения по ставкам.',
+                    $result->decisionsCount,
                     $result->campaignMode->value,
                     $result->roas ?? '—',
-                    $result->restrictUpIfRoasBelow,
-                    $result->decisionsCount,
                 ),
             );
 

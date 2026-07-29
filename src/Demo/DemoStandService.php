@@ -8,6 +8,7 @@ use App\Entity\Cluster;
 use App\Metrics\CampaignModeResolver;
 use App\Metrics\MetricsAggregator;
 use App\Repository\CampaignRepository;
+use App\Service\CampaignRemovalService;
 use App\Sync\WbStatsSyncService;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -19,6 +20,7 @@ final class DemoStandService
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CampaignRepository $campaignRepository,
+        private readonly CampaignRemovalService $campaignRemovalService,
         private readonly WbStatsSyncService $statsSyncService,
         private readonly BiddingPipeline $biddingPipeline,
         private readonly MetricsAggregator $metricsAggregator,
@@ -35,8 +37,7 @@ final class DemoStandService
         $wasReset = false;
 
         if ($existing !== null && $reset) {
-            $this->entityManager->remove($existing);
-            $this->entityManager->flush();
+            $this->campaignRemovalService->delete($existing);
             $existing = null;
             $wasReset = true;
         }
