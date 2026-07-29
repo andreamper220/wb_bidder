@@ -1,0 +1,28 @@
+[
+  {
+    "advertId": 100001,
+    "views": 10000,
+    "clicks": 500,
+    "orders": 50,
+    "sum": 5000.00,
+    "sum_price": 20000.00,
+    "days": [
+      {
+        "date": "2026-07-20T00:00:00Z",
+        "views": 5000,
+        "clicks": 250,
+        "orders": 25,
+        "sum": 2500.00,
+        "sum_price": 10000.00
+      },
+      {
+        "date": "2026-07-21T00:00:00Z",
+        "views": 5000,
+        "clicks": 250,
+        "orders": 25,
+        "sum": 2500.00,
+        "sum_price": 10000.00
+      }
+    ]
+  }
+]

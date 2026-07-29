@@ -1,0 +1,111 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: dev
+      APP_SECRET: docker_secret_change_me
+      DATABASE_URL: postgresql://wb:wb@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      WB_API_MOCK: "1"
+      WB_API_KEY: ""
+      WB_API_BASE_URL: https://advert-api.wildberries.ru
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - .:/var/www/html
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - app
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: wb_bidder
+      POSTGRES_USER: wb
+      POSTGRES_PASSWORD: wb
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wb -d wb_bidder"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  worker-sync:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    command: php bin/console messenger:consume wb_sync -vv --time-limit=3600
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: dev
+      APP_SECRET: docker_secret_change_me
+      DATABASE_URL: postgresql://wb:wb@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      WB_API_MOCK: "1"
+    depends_on:
+      - app
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  worker-bidding:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    command: php bin/console messenger:consume wb_bidding -vv --time-limit=3600
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: dev
+      APP_SECRET: docker_secret_change_me
+      DATABASE_URL: postgresql://wb:wb@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      WB_API_MOCK: "1"
+    depends_on:
+      - app
+      - redis
+      - postgres
+    restart: unless-stopped
+
+  worker-execution:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    command: php bin/console messenger:consume wb_execution -vv --time-limit=3600
+    volumes:
+      - .:/var/www/html
+    environment:
+      APP_ENV: dev
+      APP_SECRET: docker_secret_change_me
+      DATABASE_URL: postgresql://wb:wb@postgres:5432/wb_bidder?serverVersion=16&charset=utf8
+      MESSENGER_TRANSPORT_DSN: redis://redis:6379/messages
+      WB_API_MOCK: "1"
+    depends_on:
+      - app
+      - redis
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

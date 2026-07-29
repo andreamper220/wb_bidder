@@ -1,0 +1,9 @@
+{% macro icon(help) %}
+<span data-bs-toggle="tooltip" data-bs-placement="top" title="{{ help|e('html_attr') }}" tabindex="0" aria-label="Пояснение">
+    <i class="fa fa-question-circle text-muted ms-1" style="font-size:0.85em;cursor:help"></i>
+</span>
+{% endmacro %}
+
+{% macro th(label, help) %}
+<th>{{ label }} {{ _self.icon(help) }}</th>
+{% endmacro %}

@@ -1,0 +1,70 @@
+{
+  "items": [
+    {
+      "advertId": 100001,
+      "nmId": 987654321,
+      "dailyStats": [
+        {
+          "date": "2026-07-20",
+          "stat": {
+            "normQuery": "кроссовки мужские",
+            "views": 1000,
+            "clicks": 100,
+            "orders": 10,
+            "spend": 400.00
+          }
+        },
+        {
+          "date": "2026-07-21",
+          "stat": {
+            "normQuery": "кроссовки мужские",
+            "views": 1000,
+            "clicks": 100,
+            "orders": 10,
+            "spend": 400.00
+          }
+        },
+        {
+          "date": "2026-07-20",
+          "stat": {
+            "normQuery": "кроссовки черные",
+            "views": 800,
+            "clicks": 80,
+            "orders": 2,
+            "spend": 600.00
+          }
+        },
+        {
+          "date": "2026-07-21",
+          "stat": {
+            "normQuery": "кроссовки черные",
+            "views": 800,
+            "clicks": 80,
+            "orders": 2,
+            "spend": 600.00
+          }
+        },
+        {
+          "date": "2026-07-20",
+          "stat": {
+            "normQuery": "кроссовки бег",
+            "views": 500,
+            "clicks": 50,
+            "orders": 5,
+            "spend": 250.00
+          }
+        },
+        {
+          "date": "2026-07-21",
+          "stat": {
+            "normQuery": "кроссовки бег",
+            "views": 500,
+            "clicks": 50,
+            "orders": 5,
+            "spend": 250.00
+          }
+        }
+      ]
+    }
+  ]
+}

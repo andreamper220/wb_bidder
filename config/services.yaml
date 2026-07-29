@@ -1,0 +1,19 @@
+parameters:
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\:
+        resource: '../src/'
+        exclude:
+            - '../src/DependencyInjection/'
+            - '../src/Entity/'
+            - '../src/Kernel.php'
+
+    App\Bidding\Guard\BidGuardChain:
+        arguments:
+            $guards:
+                - '@App\Bidding\Guard\MinMaxBidGuard'
+                - '@App\Bidding\Guard\CooldownGuard'

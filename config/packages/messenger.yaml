@@ -1,0 +1,44 @@
+framework:
+    messenger:
+        failure_transport: failed
+
+        transports:
+            wb_sync:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: wb_sync
+                    group: wb_sync
+                    consumer: wb_sync
+            wb_bidding:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: wb_bidding
+                    group: wb_bidding
+                    consumer: wb_bidding
+            wb_execution:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: wb_execution
+                    group: wb_execution
+                    consumer: wb_execution
+            failed:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    stream: failed
+                    group: failed
+                    consumer: failed
+            sync: 'sync://'
+
+        routing:
+            App\Message\SyncCampaignStatsMessage: wb_sync
+            App\Message\RunBiddingMessage: wb_bidding
+            App\Message\ApplyBidDecisionMessage: wb_execution
+
+when@test:
+    framework:
+        messenger:
+            transports:
+                wb_sync: 'in-memory://'
+                wb_bidding: 'in-memory://'
+                wb_execution: 'in-memory://'
+                failed: 'in-memory://'

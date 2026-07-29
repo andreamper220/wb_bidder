@@ -1,0 +1,395 @@
+{% extends '@EasyAdmin/page/content.html.twig' %}
+
+{% block content_title %}Панель управления{% endblock %}
+
+{% block main %}
+{% import 'admin/_table_column_help.html.twig' as col %}
+{% set s = panel.summary %}
+
+<div class="card border-warning mb-4 shadow-sm">
+    <div class="card-header bg-warning text-dark">
+        <i class="fa fa-flask me-2"></i><strong>Демонстрационный стенд</strong>
+        {% if s.mockApi %}
+            <span class="badge bg-dark ms-2">WB_API_MOCK=1</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-lg-4 mb-3 mb-lg-0">
+                <h6 class="text-uppercase text-muted small">Что произойдёт</h6>
+                <ol class="small mb-0">
+                    <li>Создаётся кампания <strong>«Demo кроссовки»</strong> (WB advert #100001) с тремя поисковыми кластерами.</li>
+                    <li>Из mock-фикстур (<code>tests/Fixtures/WbApi/</code>) загружается статистика кампании (fullstats) и кластеров (normquery).</li>
+                    <li>Пайплайн рассчитывает решения по ставкам в режиме <strong>dry-run</strong> — ставки в Wildberries не отправляются.</li>
+                    <li>Панель обновится: появятся метрики, режим кампании и таблица решений.</li>
+                </ol>
+            </div>
+            <div class="col-lg-4 mb-3 mb-lg-0">
+                <h6 class="text-uppercase text-muted small">Данные для демонстрации</h6>
+                <p class="small mb-2">Окно метрик: <strong>7 дней</strong> (2 дня в фикстурах, даты сдвигаются на «вчера/сегодня»).</p>
+                <table class="table table-sm table-bordered small mb-2">
+                    <thead class="table-light">
+                        <tr><th>Уровень</th><th>Показатели</th><th>Ожидание</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Кампания</td>
+                            <td>расход 5&nbsp;000 ₽, выручка 20&nbsp;000 ₽</td>
+                            <td>ROAS = <strong>4.0</strong> → режим зависит от <code>restrict_up</code> (см. ниже)</td>
+                        </tr>
+                        <tr>
+                            <td>кроссовки мужские</td>
+                            <td>20 заказов, CPA ≈ 40 ₽</td>
+                            <td>CPA &lt; target 500 ₽ → <strong>UP</strong></td>
+                        </tr>
+                        <tr>
+                            <td>кроссовки черные</td>
+                            <td>4 заказа, CPA ≈ 300 ₽</td>
+                            <td>CPA &lt; target → <strong>UP</strong></td>
+                        </tr>
+                        <tr>
+                            <td>кроссовки бег</td>
+                            <td>10 заказов, CPA ≈ 50 ₽</td>
+                            <td>CPA &lt; target → <strong>UP</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p class="small text-muted mb-0">Target CPA демо-кампании: 500 ₽. Кампания помечена <code>dry-run</code>.</p>
+            </div>
+            <div class="col-lg-4">
+                <h6 class="text-uppercase text-muted small">Как оценить результат</h6>
+                <ul class="small mb-0">
+                    <li>В карточках KPI: режим кампании и ROAS около <strong>4.0000</strong>.</li>
+                    <li>В таблице кампаний: бейдж <code>dry-run</code>, автобиддинг <code>ON</code>.</li>
+                    <li><strong>BALANCED</strong> (restrict_up = 3.0): proposal <code>UP</code>, итог <code>UP</code>.</li>
+                    <li><strong>DEFENSIVE</strong> (restrict_up &gt; 4.0, напр. 4.5): proposal <code>UP</code>, итог <code>HOLD</code> — повышение заблокировано.</li>
+                    <li>В «История ставок»: статус <code>pending</code>; в DEFENSIVE ставка не меняется.</li>
+                </ul>
+            </div>
+        </div>
+
+        <hr>
+
+        <form method="post" action="{{ urls.demoStand }}" id="demoStandForm">
+            <div class="row align-items-start mb-3">
+                <div class="col-lg-7">
+                    <label for="restrictUp" class="form-label fw-semibold">
+                        <code>restrict_up_if_roas_below</code> — порог защитного режима
+                    </label>
+                    <div class="input-group input-group-lg mb-2">
+                        <input
+                            type="number"
+                            class="form-control"
+                            name="restrict_up_if_roas_below"
+                            id="restrictUp"
+                            value="{{ restrictUpDefault }}"
+                            min="0.1"
+                            step="0.1"
+                            required
+                        >
+                        <span class="input-group-text">ROAS</span>
+                    </div>
+                    <p class="small text-muted mb-2">
+                        <strong>Зачем нужен:</strong> это порог уровня 1 (кампания). Если ROAS кампании
+                        <strong>ниже</strong> этого значения, система переходит в режим <span class="badge bg-danger">DEFENSIVE</span>
+                        и <strong>блокирует повышение ставок</strong> на кластерах — даже когда CPA кластера хороший
+                        и стратегия предлагает <code>UP</code>, итоговое действие станет <code>HOLD</code>.
+                        Так защищают бюджет, когда кампания в целом не окупается.
+                    </p>
+                    <p class="small mb-0" id="demoModeHint">
+                        При демо ROAS = <strong>{{ demoRoas }}</strong> и allow_up = <strong>{{ allowUpDefault }}</strong>:
+                        <span class="badge bg-secondary" id="demoModeBadge">—</span>
+                        <span class="text-muted" id="demoModeText"></span>
+                    </p>
+                </div>
+                <div class="col-lg-5">
+                    <p class="small fw-semibold mb-1">Быстрые значения для теста</p>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-restrict="3.0">3.0 — BALANCED</button>
+                        <button type="button" class="btn btn-sm btn-outline-danger" data-restrict="4.5">4.5 — DEFENSIVE</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" data-restrict="3.5">3.5 — BALANCED</button>
+                    </div>
+                    <p class="small text-muted mb-0">
+                        Для DEFENSIVE задайте restrict <strong>выше 4.0</strong> (ROAS демо-данных).
+                        Для GROWTH нужен ROAS ≥ 5.0 — в этих фикстурах не достижим.
+                    </p>
+                </div>
+            </div>
+
+            <input type="hidden" name="_token" value="{{ csrf_token('demo_stand') }}">
+            <div class="d-flex flex-column flex-md-row align-items-md-center gap-3">
+                <button type="submit" class="btn btn-warning btn-lg px-5 py-3 fw-bold">
+                    <i class="fa fa-play me-2"></i>Запустить демо-стенд
+                </button>
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="reset" value="1" id="demoReset" checked>
+                    <label class="form-check-label" for="demoReset">
+                        Удалить предыдущую демо-кампанию (#100001) перед запуском
+                    </label>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+(function () {
+    const DEMO_ROAS = parseFloat('{{ demoRoas }}');
+    const ALLOW_UP = parseFloat('{{ allowUpDefault }}');
+    const input = document.getElementById('restrictUp');
+    const badge = document.getElementById('demoModeBadge');
+    const modeText = document.getElementById('demoModeText');
+
+    function resolveMode(restrict) {
+        if (DEMO_ROAS < restrict) {
+            return { name: 'DEFENSIVE', class: 'bg-danger', detail: 'UP на кластерах будет заблокирован → HOLD' };
+        }
+        if (DEMO_ROAS >= ALLOW_UP) {
+            return { name: 'GROWTH', class: 'bg-success', detail: 'повышения разрешены, больший max up %' };
+        }
+        return { name: 'BALANCED', class: 'bg-secondary', detail: 'CPA-логика без блокировки UP' };
+    }
+
+    function updateHint() {
+        const restrict = parseFloat(input.value);
+        if (Number.isNaN(restrict)) {
+            badge.textContent = '—';
+            badge.className = 'badge bg-secondary';
+            modeText.textContent = 'введите корректное число';
+            return;
+        }
+        const mode = resolveMode(restrict);
+        badge.textContent = mode.name;
+        badge.className = 'badge ' + mode.class;
+        modeText.textContent = ' — ' + mode.detail;
+    }
+
+    input.addEventListener('input', updateHint);
+    document.querySelectorAll('[data-restrict]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            input.value = btn.getAttribute('data-restrict');
+            updateHint();
+        });
+    });
+
+    updateHint();
+})();
+</script>
+
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-primary h-100">
+            <div class="card-body">
+                <div class="text-muted small">Кампании</div>
+                <div class="fs-3 fw-bold">{{ s.campaignsTotal }}</div>
+                <div class="small">автобиддинг: {{ s.biddingEnabled }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-secondary h-100">
+            <div class="card-body">
+                <div class="text-muted small">Решения по ставкам</div>
+                <div class="fs-3 fw-bold">{{ s.decisionsTotal }}</div>
+                <div class="small">
+                    pending {{ s.decisionsPending }} · applied {{ s.decisionsApplied }} · skipped {{ s.decisionsSkipped }}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-danger h-100">
+            <div class="card-body">
+                <div class="text-muted small">DEFENSIVE</div>
+                <div class="fs-3 fw-bold text-danger">{{ s.modeDefensive }}</div>
+                <div class="small">кампаний с низким ROAS</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card border-success h-100">
+            <div class="card-body">
+                <div class="text-muted small">GROWTH</div>
+                <div class="fs-3 fw-bold text-success">{{ s.modeGrowth }}</div>
+                <div class="small">BALANCED: {{ s.modeBalanced }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-lg-8 mb-3">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span>Кампании</span>
+                <a href="{{ urls.campaigns }}" class="btn btn-sm btn-outline-primary">Все кампании</a>
+            </div>
+            <div class="card-body p-0">
+                {% if panel.campaigns is empty %}
+                    <p class="p-3 text-muted mb-0">Нет кампаний. Нажмите «Запустить демо-стенд» выше или создайте кампанию вручную.</p>
+                {% else %}
+                <table class="table table-striped table-hover mb-0">
+                    <thead>
+                        <tr>
+                            {{ col.th('Название', 'Имя кампании в системе. Под названием — WB advert ID для API Wildberries.') }}
+                            {{ col.th('Режим', 'Режим уровня 1 по ROAS: DEFENSIVE блокирует повышения на кластерах, BALANCED — обычная CPA-логика, GROWTH — можно смелее поднимать ставки.') }}
+                            {{ col.th('ROAS', 'Выручка ÷ расход за окно метрик (данные fullstats). Определяет режим кампании на уровне 1.') }}
+                            {{ col.th('Расход', 'Сумма рекламных расходов за окно метрик, в рублях.') }}
+                            {{ col.th('Выручка', 'Сумма выручки от заказов за окно метрик (fullstats). Используется для ROAS кампании.') }}
+                            {{ col.th('Кластеры', 'Число поисковых кластеров (norm_query). На каждом считается CPA и отдельная ставка (уровень 2).') }}
+                            {{ col.th('Статус', 'ON — автобиддинг включён. dry-run — решения сохраняются, но ставки в WB не отправляются.') }}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in panel.campaigns %}
+                        <tr>
+                            <td>
+                                <strong>{{ row.name }}</strong>
+                                <div class="small text-muted">WB #{{ row.wbAdvertId }}</div>
+                            </td>
+                            <td>
+                                {% if row.mode.value == 'DEFENSIVE' %}
+                                    <span class="badge bg-danger">{{ row.mode.value }}</span>
+                                {% elseif row.mode.value == 'GROWTH' %}
+                                    <span class="badge bg-success">{{ row.mode.value }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ row.mode.value }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ row.roas ?? '—' }}</td>
+                            <td>{{ row.spend }}</td>
+                            <td>{{ row.revenue }}</td>
+                            <td>{{ row.clusters }}</td>
+                            <td>
+                                {% if row.biddingEnabled %}
+                                    <span class="badge bg-primary">ON</span>
+                                {% else %}
+                                    <span class="badge bg-light text-dark">OFF</span>
+                                {% endif %}
+                                {% if row.dryRun %}
+                                    <span class="badge bg-warning text-dark">dry-run</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-4 mb-3">
+        <div class="card h-100">
+            <div class="card-header">Быстрые действия</div>
+            <div class="card-body">
+                <p class="small text-muted mb-3">Команды для CLI (в контейнере <code>app</code>):</p>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2"><code>wb:demo-stand</code> — демо-стенд (seed + sync + решения)</li>
+                    <li class="mb-2"><code>wb:sync-stats</code> — синхронизация статистики</li>
+                    <li class="mb-2"><code>wb:run-bidding --dry-run</code> — расчёт без отправки</li>
+                    <li class="mb-2"><code>wb:run-bidding</code> — расчёт и очередь apply</li>
+                </ul>
+                <hr>
+                <a href="{{ urls.campaignNew }}" class="btn btn-primary btn-sm w-100 mb-2">+ Новая кампания</a>
+                <a href="{{ urls.decisions }}" class="btn btn-outline-secondary btn-sm w-100">История ставок</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Последние решения по ставкам</span>
+        <a href="{{ urls.decisions }}" class="btn btn-sm btn-outline-secondary">Вся история</a>
+    </div>
+    <div class="card-body p-0">
+        {% if panel.recentDecisions is empty %}
+            <p class="p-3 text-muted mb-0">Решений ещё нет. Нажмите «Запустить демо-стенд» на панели.</p>
+        {% else %}
+        <table class="table table-sm table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Время</th>
+                    <th>Кампания</th>
+                    <th>Кластер</th>
+                    <th>Предложение</th>
+                    <th>Итог</th>
+                    <th>Ставка</th>
+                    <th>Статус</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for d in panel.recentDecisions %}
+                <tr>
+                    <td class="small">{{ d.createdAt|date('d.m H:i') }}</td>
+                    <td>{{ d.campaign.name }}</td>
+                    <td class="small">{{ d.cluster.normQuery }}</td>
+                    <td>{{ d.proposalAction ? d.proposalAction.value : '—' }}</td>
+                    <td><strong>{{ d.finalAction.value }}</strong></td>
+                    <td class="small">{{ d.oldBidKopecks }} → {{ d.newBidKopecks }}</td>
+                    <td><span class="badge bg-light text-dark">{{ d.status.value }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+</div>
+
+<div class="accordion" id="helpAccordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpStrategy">
+                Справка: двухуровневая стратегия
+            </button>
+        </h2>
+        <div id="helpStrategy" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+            <div class="accordion-body">
+                <p><strong>Уровень 1 — Кампания (ROAS):</strong> ROAS = выручка ÷ расход (fullstats). Задаёт режим DEFENSIVE / BALANCED / GROWTH.</p>
+                <p><strong>Уровень 2 — Кластер (CPA):</strong> CPA = расход ÷ заказы (normquery). Предлагает up / down / hold / pause.</p>
+                <p><strong>Слияние:</strong> в DEFENSIVE повышения блокируются, даже если CPA кластера низкий.</p>
+                <p class="mb-0"><strong>Фраза:</strong> не поддерживается WB API — только поисковые кластеры (norm_query).</p>
+            </div>
+        </div>
+    </div>
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpModes">
+                Справка: режимы кампании
+            </button>
+        </h2>
+        <div id="helpModes" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+            <div class="accordion-body">
+                <div class="row">
+                    <div class="col-md-4">
+                        <strong>DEFENSIVE</strong>
+                        <p class="small">ROAS ниже порога <code>restrict_up_if_roas_below</code>. Повышение ставок на кластерах запрещено.</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>BALANCED</strong>
+                        <p class="small">ROAS в норме. Полная логика CPA на кластерах.</p>
+                    </div>
+                    <div class="col-md-4">
+                        <strong>GROWTH</strong>
+                        <p class="small">ROAS выше <code>allow_up_if_roas_above</code>. CPA + можно смелее поднимать (growth max up %).</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpDemo">
+                Справка: демо-стенд
+            </button>
+        </h2>
+        <div id="helpDemo" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+            <div class="accordion-body">
+                <p>Демонстрационный стенд использует фикстуры WB API (<code>tests/Fixtures/WbApi/</code>) при <code>WB_API_MOCK=1</code>.</p>
+                <p>На панели есть кнопка <strong>«Запустить демо-стенд»</strong> — она делает то же, что CLI-команда <code>wb:demo-stand</code>.</p>
+                <p class="mb-0">Альтернатива из терминала: <code>docker compose exec app php bin/console wb:demo-stand --reset</code></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
