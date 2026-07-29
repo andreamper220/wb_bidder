@@ -6,14 +6,14 @@ use App\Entity\BidDecision;
 use App\Enum\BidAction;
 use App\Enum\BidDecisionStatus;
 use App\Repository\BidDecisionRepository;
-use App\WbApi\WbPromotionApiAdapter;
+use App\WbApi\WbPromotionApiClient;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class BidExecutionService
 {
     public function __construct(
         private readonly BidDecisionRepository $bidDecisionRepository,
-        private readonly WbPromotionApiAdapter $wbApi,
+        private readonly WbPromotionApiClient $wbApi,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }

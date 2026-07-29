@@ -38,7 +38,7 @@ class CampaignCrudController extends AbstractCrudController
     {
         $isDetail = $pageName === Crud::PAGE_DETAIL;
 
-        yield $this->openSection('Основные', null, $isDetail);
+        yield $this->openSection('Основные', 'Для реальной кампании: укажите WB advert ID из кабинета, сначала включите dry-run и выключите автобиддинг. После sync-stats и проверки решений — включите автобиддинг и снимите dry-run. См. docs/PRODUCTION.md.', $isDetail);
 
         yield TextField::new('name')
             ->setLabel(ColumnHelpLabel::make(

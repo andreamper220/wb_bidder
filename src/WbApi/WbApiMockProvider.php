@@ -28,6 +28,14 @@ final class WbApiMockProvider
         return $this->shiftNormqueryDates($data);
     }
 
+    public function getNormqueryBids(): array
+    {
+        $path = $this->projectDir . '/tests/Fixtures/WbApi/normquery_bids.json';
+        $data = json_decode(file_get_contents($path), true, 512, JSON_THROW_ON_ERROR);
+
+        return $data;
+    }
+
     /**
      * Keeps demo fixtures inside the metrics window regardless of calendar date.
      *

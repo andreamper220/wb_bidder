@@ -4,6 +4,7 @@ namespace App\WbApi;
 
 use App\WbApi\Dto\FullstatsCampaignDto;
 use App\WbApi\Dto\FullstatsDayDto;
+use App\WbApi\Dto\NormqueryClusterBidDto;
 use App\WbApi\Dto\NormqueryClusterStatDto;
 
 /**
@@ -68,6 +69,28 @@ final class WbApiResponseMapper
                     (string) ($stat['spend'] ?? $stat['sum'] ?? 0),
                 );
             }
+        }
+
+        return $result;
+    }
+
+    /** @return NormqueryClusterBidDto[] */
+    public function mapNormqueryBids(array $data): array
+    {
+        $result = [];
+
+        foreach ($data['bids'] ?? [] as $item) {
+            $normQuery = (string) ($item['normQuery'] ?? $item['norm_query'] ?? '');
+            if ($normQuery === '') {
+                continue;
+            }
+
+            $result[] = new NormqueryClusterBidDto(
+                (int) ($item['advertId'] ?? $item['advert_id'] ?? 0),
+                (int) ($item['nmId'] ?? $item['nm_id'] ?? 0),
+                $normQuery,
+                (int) ($item['bid'] ?? $item['bidKopecks'] ?? 0),
+            );
         }
 
         return $result;

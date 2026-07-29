@@ -8,14 +8,14 @@ use App\Entity\Cluster;
 use App\Entity\ClusterDailyStat;
 use App\Repository\CampaignRepository;
 use App\WbApi\Dto\NormqueryClusterStatDto;
-use App\WbApi\WbPromotionApiAdapter;
+use App\WbApi\WbPromotionApiClient;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class WbStatsSyncService
 {
     public function __construct(
         private readonly CampaignRepository $campaignRepository,
-        private readonly WbPromotionApiAdapter $wbApi,
+        private readonly WbPromotionApiClient $wbApi,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -56,6 +56,8 @@ final class WbStatsSyncService
             $stat->setSpend($dto->spend);
         }
 
+        $this->syncClusterBids($campaign);
+
         $this->entityManager->flush();
     }
 
@@ -85,11 +87,45 @@ final class WbStatsSyncService
             }
         }
 
-        $cluster = new Cluster($campaign, $dto->nmId, $dto->normQuery, 10000);
+        $cluster = new Cluster($campaign, $dto->nmId, $dto->normQuery);
         $campaign->addCluster($cluster);
         $this->entityManager->persist($cluster);
 
         return $cluster;
+    }
+
+    private function syncClusterBids(Campaign $campaign): void
+    {
+        $nmIds = [];
+        foreach ($campaign->getClusters() as $cluster) {
+            $nmIds[$cluster->getNmId()] = true;
+        }
+
+        if ($nmIds === []) {
+            return;
+        }
+
+        foreach (array_keys($nmIds) as $nmId) {
+            $bids = $this->wbApi->getNormqueryBids($campaign->getWbAdvertId(), $nmId);
+
+            foreach ($bids as $bidDto) {
+                $cluster = $this->findClusterByNormQuery($campaign, $bidDto->normQuery);
+                if ($cluster !== null) {
+                    $cluster->setCurrentBidKopecks($bidDto->bidKopecks);
+                }
+            }
+        }
+    }
+
+    private function findClusterByNormQuery(Campaign $campaign, string $normQuery): ?Cluster
+    {
+        foreach ($campaign->getClusters() as $cluster) {
+            if ($cluster->getNormQuery() === $normQuery) {
+                return $cluster;
+            }
+        }
+
+        return null;
     }
 
     private function findOrCreateCampaignStat(Campaign $campaign, \DateTimeImmutable $date): CampaignDailyStat

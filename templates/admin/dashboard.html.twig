@@ -5,6 +5,106 @@
 {% block main %}
 {% import 'admin/_table_column_help.html.twig' as col %}
 {% set s = panel.summary %}
+{% set prod = production %}
+
+<div class="card border-primary mb-4 shadow-sm" id="production-setup">
+    <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+        <span>
+            <i class="fa fa-rocket me-2"></i><strong>Реальные кампании Wildberries</strong>
+            {% if prod.ready %}
+                <span class="badge bg-success ms-2">Боевой режим</span>
+            {% elseif prod.infraReady %}
+                <span class="badge bg-warning text-dark ms-2">Инфра готова</span>
+            {% else %}
+                <span class="badge bg-light text-dark ms-2">Требуется настройка</span>
+            {% endif %}
+        </span>
+        {% if s.mockApi %}
+            <span class="badge bg-warning text-dark">WB_API_MOCK=1</span>
+        {% else %}
+            <span class="badge bg-success">Live API</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        <p class="small mb-3">
+            Проект можно использовать для боевого управления ставками поисковых кластеров (<code>norm_query</code>).
+            Пайплайн: синхронизация статистики → ROAS/CPA-стратегия → предохранители → отправка ставок в WB.
+            Полная инструкция: <code>docs/PRODUCTION.md</code>.
+        </p>
+
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <div class="small text-muted">API-ключ</div>
+                <div class="fw-semibold">
+                    {% if prod.apiKeyConfigured %}
+                        <span class="text-success"><i class="fa fa-check me-1"></i>{{ prod.apiKeyMasked }}</span>
+                    {% else %}
+                        <span class="text-danger"><i class="fa fa-times me-1"></i>не задан</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">Реальных кампаний</div>
+                <div class="fw-semibold">{{ prod.realCampaignsCount }}</div>
+            </div>
+            <div class="col-md-4">
+                <div class="small text-muted">Боевой автобиддинг</div>
+                <div class="fw-semibold">{{ prod.liveBiddingCount }} камп.</div>
+            </div>
+        </div>
+
+        <h6 class="text-uppercase text-muted small">Чеклист готовности</h6>
+        <div class="table-responsive mb-3">
+            <table class="table table-sm table-bordered mb-0">
+                <tbody>
+                    {% for check in prod.checks %}
+                    <tr>
+                        <td class="text-center" style="width: 2.5rem">
+                            {% if check.ok %}
+                                <i class="fa fa-check-circle text-success"></i>
+                            {% else %}
+                                <i class="fa fa-circle-o text-muted"></i>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <strong>{{ check.label }}</strong>
+                            <div class="small text-muted">{{ check.description }}</div>
+                            {% if not check.ok and check.hint is defined %}
+                                <div class="small text-primary mt-1"><i class="fa fa-lightbulb-o me-1"></i>{{ check.hint }}</div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr>
+                        <td class="text-center"><i class="fa fa-info-circle text-info"></i></td>
+                        <td>
+                            <strong>Воркеры очередей запущены</strong>
+                            <div class="small text-muted">worker-sync, worker-bidding, worker-execution — без них sync и отправка ставок не выполнятся.</div>
+                            <div class="small text-primary mt-1"><i class="fa fa-lightbulb-o me-1"></i>docker compose up -d worker-sync worker-bidding worker-execution</div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h6 class="text-uppercase text-muted small">Пошаговый запуск</h6>
+        <ol class="small mb-3">
+            <li>Создайте <code>.env.local</code> или <code>docker-compose.override.yml</code> (см. <code>docker-compose.override.example.yml</code>): <code>WB_API_MOCK=0</code>, <code>WB_API_KEY</code>, <code>APP_SECRET</code>.</li>
+            <li>Запустите воркеры: <code>docker compose up -d worker-sync worker-bidding worker-execution</code>.</li>
+            <li><a href="{{ urls.campaignNew }}">Создайте кампанию</a> с реальным WB advert ID, <strong>dry-run ON</strong>, автобиддинг OFF.</li>
+            <li>Синхронизируйте: <code>wb:sync-stats</code> — появятся кластеры, метрики и текущие ставки из WB.</li>
+            <li>Включите автобиддинг, проверьте решения: <code>wb:run-bidding --dry-run</code> → <a href="{{ urls.decisions }}">История ставок</a>.</li>
+            <li>Снимите dry-run → <code>wb:run-bidding</code> — ставки уйдут в WB через очередь execution.</li>
+            <li>Настройте cron для <code>wb:sync-stats</code> (каждые 1–4 ч).</li>
+        </ol>
+
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{{ urls.campaignNew }}" class="btn btn-sm btn-primary">+ Новая кампания</a>
+            <a href="{{ urls.campaigns }}" class="btn btn-sm btn-outline-primary">Все кампании</a>
+            <a href="{{ urls.decisions }}" class="btn btn-sm btn-outline-secondary">История ставок</a>
+        </div>
+    </div>
+</div>
 
 <div class="card border-warning mb-4 shadow-sm">
     <div class="card-header bg-warning text-dark">
@@ -19,7 +119,7 @@
                 <h6 class="text-uppercase text-muted small">Что произойдёт</h6>
                 <ol class="small mb-0">
                     <li>Создаётся кампания <strong>«Demo кроссовки»</strong> (WB advert #100001) с тремя поисковыми кластерами.</li>
-                    <li>Из mock-фикстур (<code>tests/Fixtures/WbApi/</code>) загружается статистика кампании (fullstats) и кластеров (normquery).</li>
+                    <li>Из mock-фикстур (<code>tests/Fixtures/WbApi/</code>) загружается статистика кампании (fullstats), кластеров (normquery) и текущие ставки (get-bids).</li>
                     <li>Пайплайн рассчитывает решения по ставкам в режиме <strong>dry-run</strong> — ставки в Wildberries не отправляются.</li>
                     <li>Панель обновится: появятся метрики, режим кампании и таблица решений.</li>
                 </ol>
@@ -368,6 +468,27 @@
 </div>
 
 <div class="accordion" id="helpAccordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpProduction">
+                Справка: реальные кампании
+            </button>
+        </h2>
+        <div id="helpProduction" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+            <div class="accordion-body">
+                <p><strong>Можно ли использовать в бою?</strong> Да. Ядро пайплайна готово: sync → bidding → execution. Перед боевым запуском настройте API, пройдите dry-run и включите воркеры.</p>
+                <p><strong>Переменные окружения:</strong></p>
+                <ul class="small">
+                    <li><code>WB_API_MOCK=0</code> — отключить mock, ходить в реальный API</li>
+                    <li><code>WB_API_KEY</code> — токен API продвижения WB</li>
+                    <li><code>APP_SECRET</code> — секрет Symfony (не оставлять значение по умолчанию)</li>
+                </ul>
+                <p><strong>Безопасный порядок:</strong> создать кампанию → sync (stats + текущие ставки из get-bids) → dry-run → проверить историю → снять dry-run → боевой run-bidding.</p>
+                <p><strong>Ограничения:</strong> только кластеры norm_query (не фразы); один nmId на кампанию; админка без авторизации — для продакшена включите security.</p>
+                <p class="mb-0">Подробно: <code>docs/PRODUCTION.md</code>, пример Docker: <code>docker-compose.override.example.yml</code>.</p>
+            </div>
+        </div>
+    </div>
     <div class="accordion-item">
         <h2 class="accordion-header">
             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#helpStrategy">

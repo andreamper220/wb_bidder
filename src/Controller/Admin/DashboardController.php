@@ -3,6 +3,7 @@
 namespace App\Controller\Admin;
 
 use App\Admin\DashboardPanelService;
+use App\Admin\ProductionReadinessService;
 use App\Demo\DemoStandService;
 use App\Repository\CampaignRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Attribute\AdminDashboard;
@@ -21,6 +22,7 @@ class DashboardController extends AbstractDashboardController
 {
     public function __construct(
         private readonly DashboardPanelService $dashboardPanel,
+        private readonly ProductionReadinessService $productionReadiness,
         private readonly AdminUrlGenerator $adminUrlGenerator,
         private readonly DemoStandService $demoStandService,
         private readonly RequestStack $requestStack,
@@ -49,6 +51,7 @@ class DashboardController extends AbstractDashboardController
 
         return $this->render('admin/dashboard.html.twig', [
             'panel' => $panel,
+            'production' => $this->productionReadiness->build(),
             'restrictUpDefault' => $restrictDefault,
             'demoRoas' => '4.0',
             'allowUpDefault' => '5.0',

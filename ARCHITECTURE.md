@@ -22,7 +22,7 @@
 
 ## Queues
 
-- `wb_sync` — fetch stats from WB API
+- `wb_sync` — fetch stats + current bids from WB API
 - `wb_bidding` — calculate decisions
 - `wb_execution` — apply bids to WB
 
@@ -31,3 +31,7 @@
 - Campaign — ROAS (Level 1)
 - Cluster — CPA (Level 2)
 - Phrase — **not supported by WB API** (disabled in UI)
+
+## Production
+
+See [docs/PRODUCTION.md](docs/PRODUCTION.md) for real campaign setup (API keys, workers, dry-run → live).

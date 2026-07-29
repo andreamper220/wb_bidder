@@ -17,3 +17,5 @@ services:
             $guards:
                 - '@App\Bidding\Guard\MinMaxBidGuard'
                 - '@App\Bidding\Guard\CooldownGuard'
+
+    App\WbApi\WbPromotionApiClient: '@App\WbApi\WbPromotionApiAdapter'

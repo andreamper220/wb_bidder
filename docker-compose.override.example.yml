@@ -1,0 +1,26 @@
+# Скопируйте в docker-compose.override.yml и задайте реальные значения.
+# Файл docker-compose.override.yml не коммитится (см. .gitignore).
+#
+# cp docker-compose.override.example.yml docker-compose.override.yml
+
+services:
+  app:
+    environment:
+      WB_API_MOCK: "0"
+      WB_API_KEY: "ваш_токен_wb_api"
+      APP_SECRET: "сгенерируйте_openssl_rand_hex_32"
+
+  worker-sync:
+    environment:
+      WB_API_MOCK: "0"
+      WB_API_KEY: "ваш_токен_wb_api"
+
+  worker-bidding:
+    environment:
+      WB_API_MOCK: "0"
+      WB_API_KEY: "ваш_токен_wb_api"
+
+  worker-execution:
+    environment:
+      WB_API_MOCK: "0"
+      WB_API_KEY: "ваш_токен_wb_api"
